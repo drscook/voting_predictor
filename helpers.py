@@ -1,16 +1,25 @@
 from constants import *
 import json, os, sys, subprocess, pathlib, warnings, dataclasses, us, census, mechanicalsoup
 import numpy as np, pandas as pd, geopandas as gpd, matplotlib.pyplot as plt, pandas_bokeh
-from google.oauth2 import service_account
+# from google.oauth2 import service_account
+from google.colab import auth, drive
 from google.cloud import bigquery
 from codetiming import Timer
 
+state = us.states.TX
 
-bq_credentials = service_account.Credentials.from_service_account_info(
-    json.loads(os.environ['REDISTRICTING_SERVICE_ACCOUNT']))
+project_id = 'redistricting-361203'
+repo = 'voting_predictor'
+mount_path = pathlib.Path('/content/drive')
+root_path = mount_path / 'MyDrive/gerrymandering/2022-10'
+repo_path = root_path / repo
+data_path = root_path / f'data/{state.abbr}'
 
-client = bigquery.Client(credentials=bq_credentials,
-    project=bq_credentials.project_id)
+auth.authenticate_user()
+drive.mount(str(mount_path))
+client = bigquery.Client(project=project_id)
+# client = bigquery.Client(credentials=bq_credentials,
+#     project=bq_credentials.project_id)
 
 api_key = 'dccb7bb4b7df5dff59d2d99c859016f973197e4e'
 census_session = census.Census(api_key)
@@ -19,11 +28,6 @@ pd.set_option('plotting.backend', 'pandas_bokeh')
 pd.plotting.output_notebook()
 warnings.filterwarnings('ignore', message='.*ShapelyDeprecationWarning.*')
 warnings.simplefilter(action='ignore', category=FutureWarning)
-
-STATE = us.states.TX
-ROOT_PATH = pathlib.Path('/work')
-DATA_PATH = ROOT_PATH / f'data/{STATE.abbr}'
-
 
 
 def listify(X):
