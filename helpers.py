@@ -213,7 +213,7 @@ def get(cols, dataset='acs5', year=2020, level='tract'):
     level_alt = level.replace('_',' ')  # census uses space rather then underscore in block_group here - we must handle and replace
     cols = listify(cols)
     df = prep(pd.DataFrame(conn.get([x.upper() for x in cols], year=year,
-        geo={'for': level_alt+':*', 'in': f'state:{STATE.fips} county:*'})
+        geo={'for': level_alt+':*', 'in': f'state:{state.fips} county:*'})
         )).rename(columns={level_alt: level})
         
     df['year'] = year

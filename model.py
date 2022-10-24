@@ -11,7 +11,10 @@ def features(year, election='general', office='President', level='tract', overwr
         qry = f"""
         select
             vtd2020,
-            party||'_'||name as campaign,
+            election,
+            office,
+            lower(party) as party,
+            campaign,
             -- party,
             votes,
         from
@@ -22,7 +25,7 @@ def features(year, election='general', office='President', level='tract', overwr
             and year = {year}
             and party in ('R', 'D')
         """
-        elections = prep(query_to_df(qry).pivot(index='vtd2020', columns='campaign', values='votes'))
+        elections = query_to_df(qry).pivot(index=['vtd2020', 'campaign'], columns='party', values='votes').fillna(0)#.reset_index('campaign')#.set_index('vtd2020')
 
         qry = f"""
         select
@@ -37,17 +40,16 @@ def features(year, election='general', office='President', level='tract', overwr
         from
             shapes.vtd2020 as A
         """
-        shapes = prep(query_to_df(qry).set_index('vtd2020'))
+        shapes = query_to_df(qry).set_index('vtd2020')
 
         qry = f"""select
             *
         from
             acs5.{year}
         """
-        acs = prep(query_to_df(qry).set_index(['vtd2020', 'year']))
+        acs = query_to_df(qry).set_index('vtd2020')
 
-        vtd = prep(elections.join(shapes, how='outer').join(acs, how='outer').fillna(0))#.reset_index()
-        # county = vtd.groupby(['county', 'year']).sum()
+        vtd = prep(elections.join(shapes, how='outer').join(acs, how='outer'))
         df = vtd
 
         for race in ['all', 'white', 'hisp', 'other']:

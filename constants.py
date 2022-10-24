@@ -104,9 +104,9 @@ FEATURES = [
         'b01001_049e', #pop female 85-inf
     ]],
     ['all'  , 'vap', 'highschool', [
-        's1501_c01_003e', #High school graduate (includes equivalency) 18-24
-        's1501_c01_004e', #Some college or associate's degree 18-24
-        's1501_c01_005e', #Bachelor's degree or higher 18-24
+        # 's1501_c01_003e', #High school graduate (includes equivalency) 18-24
+        # 's1501_c01_004e', #Some college or associate's degree 18-24
+        # 's1501_c01_005e', #Bachelor's degree or higher 18-24
         's1501_c01_009e', #High school graduate (includes equivalency) 25-inf
         's1501_c01_010e', #Some college, no degree 25-inf
         's1501_c01_011e', #Associate's degree 25-inf
