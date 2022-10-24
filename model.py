@@ -1,5 +1,5 @@
 from acs5 import *
-import torch
+import torch, matplotlib.pyplot as plt, pandas_bokeh
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 def features(year, election='general', office='President', level='tract', overwrite=False):
