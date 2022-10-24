@@ -18,8 +18,6 @@ data_path = root_path / f'data/{state.abbr}'
 auth.authenticate_user()
 drive.mount(str(mount_path))
 client = bigquery.Client(project=project_id)
-# client = bigquery.Client(credentials=bq_credentials,
-#     project=bq_credentials.project_id)
 
 api_key = 'dccb7bb4b7df5dff59d2d99c859016f973197e4e'
 census_session = census.Census(api_key)
@@ -58,7 +56,7 @@ def prep(df, fix_names=True):
     df = df.reset_index()
     if fix_names:
         df.columns = [c.strip().lower() for c in df.columns]
-    return df.apply(to_numeric).convert_dtypes().set_index(df.columns[:idx].tolist())
+    return df.apply(to_numeric).convert_dtypes().set_index(df.columns[:idx].tolist()).squeeze()
 
 def run_query(qry):
     res = client.query(qry).result()
