@@ -1,4 +1,5 @@
 from helpers import *
+import mechanicalsoup
 
 def get_plans(overwrite=False):
     level = 'block'

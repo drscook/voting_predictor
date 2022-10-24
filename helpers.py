@@ -1,7 +1,6 @@
 from constants import *
-import json, os, sys, subprocess, pathlib, warnings, dataclasses, us, census, mechanicalsoup
-import numpy as np, pandas as pd, geopandas as gpd, matplotlib.pyplot as plt, pandas_bokeh
-# from google.oauth2 import service_account
+import json, os, sys, subprocess, pathlib, warnings, us, census
+import numpy as np, pandas as pd, geopandas as gpd
 from google.colab import auth, drive
 from google.cloud import bigquery
 from codetiming import Timer
@@ -126,7 +125,7 @@ def download(file, url, unzip=True, overwrite=False):
 
 def pq_(tbl):
     subdir, filename = tbl.split('.')[-2:]
-    return DATA_PATH / f'{subdir}/{filename}.parquet'
+    return data_path / f'{subdir}/{filename}.parquet'
 
 def tbl_(pq):
     dataset, tbl = pq.parts[-2:]
@@ -135,7 +134,8 @@ def tbl_(pq):
 def df_to_parquet(df, pq, overwrite=False):
     if not pq.is_file() or overwrite:
         pq.parent.mkdir(exist_ok=True, parents=True)
-        pq.unlink(missing_ok=True)
+        if pq.is_file():
+            pq.unlink()
         prep(df).to_parquet(pq)
     return pq
 
