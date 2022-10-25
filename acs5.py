@@ -21,21 +21,37 @@ def get_acs5(year=2018, overwrite=False):
             df_to_parquet(df, pq_(tbl_raw))
 
         trans = get_transformer(year=year, level=level)['vtd']
-        cols = {x: x[:x.find("_", x.find("_")+1)] for x in get_columns(tbl_raw)[2:]}
-        sums = [f'cast(round(sum(A.{key} * B.{val}_prop)) as int) as {key}' for key, val in cols.items()]
+
+        sums = []
+        feat = []
+        for col in get_columns(tbl_raw)[2:]:
+            i = col.find('_') + 1
+            j = col.find('_', i)
+            if col[:i] != 'all_':
+                subpop = col[:j]
+                f = col[i:]
+                sums.append(f'sum(A.{col} * B.{subpop}_prop) as {col}')
+                feat.append(f)
+        feat = pd.value_counts(feat)
+        feat = [f'white_{f} + hisp_{f} + other_{f} as all_{f}' for f in feat[feat >= 3].index]
         qry = f"""
 select
-    B.vtd2020,
-    A.year,
-    {make_select(sums)},
-from
-    {tbl_raw} as A
-join
-    {trans} as B
-using
-    ({geoid})
-group by
-    1, 2
+    *,
+    {make_select(feat)},
+from (
+    select
+        B.vtd2020,
+        A.year,
+        {make_select(sums, 2)},
+    from
+        {tbl_raw} as A
+    join
+        {trans} as B
+    using
+        ({geoid})
+    group by
+        1, 2
+    )
 """
         print(f'getting {tbl}')
         query_to_table(qry, tbl)

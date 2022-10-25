@@ -15,7 +15,7 @@ repo_path = root_path / repo
 data_path = root_path / f'data/{state.abbr}'
 
 auth.authenticate_user()
-drive.mount(str(mount_path))
+# drive.mount(str(mount_path))
 client = bigquery.Client(project=project_id)
 
 api_key = 'dccb7bb4b7df5dff59d2d99c859016f973197e4e'
@@ -55,7 +55,8 @@ def prep(df, fix_names=True):
     df = df.reset_index()
     if fix_names:
         df.columns = [c.strip().lower() for c in df.columns]
-    return df.apply(to_numeric).convert_dtypes().set_index(df.columns[:idx].tolist()).squeeze()
+    return df.apply(to_numeric).set_index(df.columns[:idx].tolist()).squeeze().copy()
+    # return df.apply(to_numeric).convert_dtypes().set_index(df.columns[:idx].tolist()).squeeze().copy()
 
 def run_query(qry):
     res = client.query(qry).result()
@@ -208,7 +209,7 @@ def check_exists(tbl, overwrite=False):
 
 @Timer()
 def get(cols, dataset='acs5', year=2020, level='tract'):
-    print(f'Fetching data from {dataset}', end=elipsis)
+    print(f'fetching data from {dataset}', end=elipsis)
     conn = getattr(census_session, dataset)
     level_alt = level.replace('_',' ')  # census uses space rather then underscore in block_group here - we must handle and replace
     cols = listify(cols)

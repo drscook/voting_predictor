@@ -3,6 +3,8 @@ import torch, matplotlib.pyplot as plt, pandas_bokeh
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 def features(year, election='general', office='President', level='tract', overwrite=False):
+    m_per_mi = 1609.34
+    year = int(year)
     get_acs5(year=year, overwrite=overwrite)
     pq = data_path / f'features/{year}_{election}_{office}.parquet'
     if pq.is_file() and not overwrite:
@@ -11,11 +13,8 @@ def features(year, election='general', office='President', level='tract', overwr
         qry = f"""
         select
             vtd2020,
-            election,
-            office,
+            year || "_" || election || "_" || office as election,
             lower(party) as party,
-            campaign,
-            -- party,
             votes,
         from
             elections.all
@@ -25,18 +24,15 @@ def features(year, election='general', office='President', level='tract', overwr
             and year = {year}
             and party in ('R', 'D')
         """
-        elections = query_to_df(qry).pivot(index=['vtd2020', 'campaign'], columns='party', values='votes').fillna(0)#.reset_index('campaign')#.set_index('vtd2020')
+        elections = query_to_df(qry).pivot(index=['vtd2020', 'election'], columns='party', values='votes').fillna(0)
 
         qry = f"""
         select
             A.vtd2020,
             A.county,
-            cast(round(A.aland)             as int) as aland,
-            cast(round(A.awater)            as int) as awater,
-            cast(round(A.atot)              as int) as atot,
-            cast(round(A.perim)             as int) as perim,
-            cast(round(A.polsby_popper*100) as int) as polsby_popper,
-            cast(round(A.dist_to_border)    as int) as dist_to_border,
+            A.dist_to_border / {m_per_mi} as dist_to_border,
+            A.aland / {m_per_mi**2} as aland,
+            A.polsby_popper as polsby_popper,
         from
             shapes.vtd2020 as A
         """
@@ -48,24 +44,26 @@ def features(year, election='general', office='President', level='tract', overwr
             acs5.{year}
         """
         acs = query_to_df(qry).set_index('vtd2020')
-
-        vtd = prep(elections.join(shapes, how='outer').join(acs, how='outer'))
+        vtd = prep(elections.join(shapes, how='inner').join(acs, how='inner'))
         df = vtd
 
         for race in ['all', 'white', 'hisp', 'other']:
-            df[race+'_vap_density'] = (df[race+'_vap_pop'] / np.fmax(df['aland'], 1) * 1609.34**2)
+            df[f'{race}_vap_density'] = (df[f'{race}_vap_pop'] / df['aland']).fillna(0)
         df['votes'] = df[elections.columns].sum(axis=1)
-        for candidate in elections.columns:
-            df[candidate+'_pct'] = df[candidate] / np.fmax(df['all_tot_pop'], 1) * 100
+        for party in elections.columns:
+            col = party+'_prop'
+            df[col] = (df[party] / df['all_vap_pop']).clip(0, 1)
+            df[col].fillna(df[col].median(), inplace=True)
 
         for col in df.columns:
             a = col.find('_')+1
-            b = col[a:].find('_')+a+1
+            b = col.find('_', a)+1
             subpop = col[:b] + 'pop'
-            if col[b:] != 'pop' and subpop in df.columns:
-                df[col] /= np.fmax(df[subpop], 1)
+            if col[b:] not in ['pop', 'density'] and subpop in df.columns:
+                df[col] = (df[col] / df[subpop]).clip(0, 1)
+                df[col].fillna(df[col].median(), inplace=True)                
+        col = 'hisp_vap_spanish_at_home_english_well'
+        df[col] = df[col] / df['hisp_vap_spanish_at_home']
+        df[col].fillna(df[col].median(), inplace=True)
         df_to_parquet(df, pq)
-    
-    return pq
-
-
+    return df
