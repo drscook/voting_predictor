@@ -1,5 +1,5 @@
 from constants import *
-import json, os, sys, subprocess, pathlib, warnings, us, census
+import json, os, sys, subprocess, pathlib, shutil, warnings, itertools as it, us, census
 import numpy as np, pandas as pd, geopandas as gpd
 from google.colab import auth, drive
 from google.cloud import bigquery
@@ -13,6 +13,7 @@ MOUNT_PATH = pathlib.Path('/content/drive')
 ROOT_PATH = MOUNT_PATH / 'MyDrive/gerrymandering/2022-10'
 REPO_PATH = ROOT_PATH / repo
 DATA_PATH = ROOT_PATH / f'data/{STATE.abbr}'
+MODEL_PATH= ROOT_PATH / f'models'
 
 auth.authenticate_user()
 # drive.mount(str(mount_path))
@@ -26,6 +27,10 @@ pd.plotting.output_notebook()
 warnings.filterwarnings('ignore', message='.*ShapelyDeprecationWarning.*')
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
+def mkdir(path, overwrite=False):
+    if overwrite:
+        shutil.rmtree(path, ignore_errors=True)
+    path.mkdir(exist_ok=True, parents=True)
 
 def listify(X):
     """Turns almost anything into a list"""
@@ -42,7 +47,6 @@ def listify(X):
             return [X]
 
 def cartesian(D):
-    import itertools as it
     D = {key: listify(val) for key, val in D.items()}
     return [dict(zip(D.keys(), x)) for x in it.product(*D.values())]
 
@@ -60,7 +64,7 @@ def prep(df, fix_names=True):
     df = df.reset_index()
     if fix_names:
         df.columns = [c.strip().lower() for c in df.columns]
-    return df.apply(to_numeric).set_index(df.columns[:idx].tolist()).squeeze().copy()
+    return df.apply(to_numeric).set_index(df.columns[:idx].tolist()).copy()
     # return df.apply(to_numeric).convert_dtypes().set_index(df.columns[:idx].tolist()).squeeze().copy()
 
 def run_query(qry):
@@ -122,7 +126,7 @@ def download(file, url, unzip=True, overwrite=False):
         file.unlink(missing_ok=True)
     if not file.is_file():  # check if file already exists
         print(f'downloading from {url}', end=elipsis)
-        file.parent.mkdir(exist_ok=True, parents=True)
+        mkdir(file.parent)
         subprocess.run(['wget', '-O', file, url], capture_output=True)
         print('done!')
     if file.suffix == '.zip' and unzip:
@@ -138,10 +142,10 @@ def tbl_(pq):
     return f'{dataset}.{tbl}'
 
 def df_to_parquet(df, pq, overwrite=False):
-    if not pq.is_file() or overwrite:
-        pq.parent.mkdir(exist_ok=True, parents=True)
-        if pq.is_file():
-            pq.unlink()
+    if overwrite:
+        pq.unlink(missing_ok=True)
+    if not pq.is_file():
+        mkdir(pq.parent)
         prep(df).to_parquet(pq)
     return pq
 
