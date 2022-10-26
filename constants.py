@@ -27,6 +27,10 @@ SUBPOPS = {
 
 FEATURES = [
     ['all'  , 'tot', 'pop', ['b01001_001e']],
+    ['white', 'tot', 'pop', ['b01001h_001e']],
+    ['hisp' , 'tot', 'pop', ['b01001i_001e']],
+
+
     ['all'  , 'vap', 'pop', [
         'b01001_007e', #pop male 18-19
         'b01001_008e', #pop male 20
@@ -67,53 +71,6 @@ FEATURES = [
         'b01001_048e', #pop female 80-84
         'b01001_049e', #pop female 85-inf
     ]],
-    ['all'  , 'vap', 'poverty', [
-        'b17001_010e', #poverty male 18-24'
-        'b17001_011e', #poverty male 25-34'
-        'b17001_012e', #poverty male 35-44'
-        'b17001_013e', #poverty male 45-54'
-        'b17001_014e', #poverty male 55-64'
-        'b17001_015e', #poverty male 65-74'
-        'b17001_016e', #poverty male 74-inf'
-        'b17001_024e', #poverty female 18-24'
-        'b17001_025e', #poverty female 25-34'
-        'b17001_026e', #poverty female 35-44'
-        'b17001_027e', #poverty female 45-54'
-        'b17001_028e', #poverty female 55-64'
-        'b17001_029e', #poverty female 65-74'
-        'b17001_030e', #poverty female 74-inf'
-    ]],
-    ['all'  , 'vap', 'elderly', [
-        'b01001_017e', #pop male 55-59
-        'b01001_018e', #pop male 60-61
-        'b01001_019e', #pop male 62-64
-        'b01001_020e', #pop male 65-66
-        'b01001_021e', #pop male 67-69
-        'b01001_022e', #pop male 70-74
-        'b01001_023e', #pop male 75-79
-        'b01001_024e', #pop male 80-84
-        'b01001_025e', #pop male 85-inf
-        'b01001_041e', #pop female 55-59
-        'b01001_042e', #pop female 60-61
-        'b01001_043e', #pop female 62-64
-        'b01001_044e', #pop female 65-66
-        'b01001_045e', #pop female 67-69
-        'b01001_046e', #pop female 70-74
-        'b01001_047e', #pop female 75-79
-        'b01001_048e', #pop female 80-84
-        'b01001_049e', #pop female 85-inf
-    ]],
-    ['all'  , 'vap', 'highschool', [
-        # 's1501_c01_003e', #High school graduate (includes equivalency) 18-24
-        # 's1501_c01_004e', #Some college or associate's degree 18-24
-        # 's1501_c01_005e', #Bachelor's degree or higher 18-24
-        's1501_c01_009e', #High school graduate (includes equivalency) 25-inf
-        's1501_c01_010e', #Some college, no degree 25-inf
-        's1501_c01_011e', #Associate's degree 25-inf
-        's1501_c01_012e', #Bachelor's degree 25-inf
-        's1501_c01_013e', #Graduate or professional degree 25-inf
-    ]],
-    ['white', 'tot', 'pop', ['b01001h_001e']],
     ['white', 'vap', 'pop', [
         'b01001h_007e', #pop male 18-19
         'b01001h_008e', #pop male 20-24
@@ -136,34 +93,6 @@ FEATURES = [
         'b01001h_030e', #pop female 75-84
         'b01001h_031e', #pop female 85-inf
     ]],
-    ['white', 'vap', 'poverty', [
-        'b17001h_010e', #poverty male 18-24'
-        'b17001h_011e', #poverty male 25-34'
-        'b17001h_012e', #poverty male 35-44'
-        'b17001h_013e', #poverty male 45-54'
-        'b17001h_014e', #poverty male 55-64'
-        'b17001h_015e', #poverty male 65-74'
-        'b17001h_016e', #poverty male 74-inf'
-        'b17001h_024e', #poverty female 18-24'
-        'b17001h_025e', #poverty female 25-34'
-        'b17001h_026e', #poverty female 35-44'
-        'b17001h_027e', #poverty female 45-54'
-        'b17001h_028e', #poverty female 55-64'
-        'b17001h_029e', #poverty female 65-74'
-        'b17001h_030e', #poverty female 74-inf'
-    ]],
-    ['white', 'vap', 'elderly', [
-            'b01001h_013e', #pop male 55-64
-            'b01001h_014e', #pop male 65-74
-            'b01001h_015e', #pop male 75-84
-            'b01001h_016e', #pop male 85-inf
-            'b01001h_028e', #pop female 55-64
-            'b01001h_029e', #pop female 65-74
-            'b01001h_030e', #pop female 75-84
-            'b01001h_031e', #pop female 85-inf
-    ]],
-    ['white', 'vap', 'highschool', ['s1501_c01_032e']],
-    ['hisp' , 'tot', 'pop', ['b01001i_001e']],
     ['hisp' , 'vap', 'pop', [
         'b01001i_007e', #pop male 18-19
         'b01001i_008e', #pop male 20-24
@@ -186,6 +115,82 @@ FEATURES = [
         'b01001i_030e', #pop female 75-84
         'b01001i_031e', #pop female 85-inf
     ]],
+
+
+    ['all'  , 'vap', 'elderly', [
+        'b01001_017e', #pop male 55-59
+        'b01001_018e', #pop male 60-61
+        'b01001_019e', #pop male 62-64
+        'b01001_020e', #pop male 65-66
+        'b01001_021e', #pop male 67-69
+        'b01001_022e', #pop male 70-74
+        'b01001_023e', #pop male 75-79
+        'b01001_024e', #pop male 80-84
+        'b01001_025e', #pop male 85-inf
+        'b01001_041e', #pop female 55-59
+        'b01001_042e', #pop female 60-61
+        'b01001_043e', #pop female 62-64
+        'b01001_044e', #pop female 65-66
+        'b01001_045e', #pop female 67-69
+        'b01001_046e', #pop female 70-74
+        'b01001_047e', #pop female 75-79
+        'b01001_048e', #pop female 80-84
+        'b01001_049e', #pop female 85-inf
+    ]],
+    ['white', 'vap', 'elderly', [
+            'b01001h_013e', #pop male 55-64
+            'b01001h_014e', #pop male 65-74
+            'b01001h_015e', #pop male 75-84
+            'b01001h_016e', #pop male 85-inf
+            'b01001h_028e', #pop female 55-64
+            'b01001h_029e', #pop female 65-74
+            'b01001h_030e', #pop female 75-84
+            'b01001h_031e', #pop female 85-inf
+    ]],
+    ['hisp' , 'vap', 'elderly', [
+        'b01001i_013e', #pop male 55-64
+        'b01001i_014e', #pop male 65-74
+        'b01001i_015e', #pop male 75-84
+        'b01001i_016e', #pop male 85-inf  
+        'b01001i_028e', #pop female 55-64
+        'b01001i_029e', #pop female 65-74
+        'b01001i_030e', #pop female 75-84
+        'b01001i_031e', #pop female 85-inf
+    ]],
+
+
+    ['all'  , 'vap', 'poverty', [
+        'b17001_010e', #poverty male 18-24'
+        'b17001_011e', #poverty male 25-34'
+        'b17001_012e', #poverty male 35-44'
+        'b17001_013e', #poverty male 45-54'
+        'b17001_014e', #poverty male 55-64'
+        'b17001_015e', #poverty male 65-74'
+        'b17001_016e', #poverty male 74-inf'
+        'b17001_024e', #poverty female 18-24'
+        'b17001_025e', #poverty female 25-34'
+        'b17001_026e', #poverty female 35-44'
+        'b17001_027e', #poverty female 45-54'
+        'b17001_028e', #poverty female 55-64'
+        'b17001_029e', #poverty female 65-74'
+        'b17001_030e', #poverty female 74-inf'
+    ]],
+    ['white', 'vap', 'poverty', [
+        'b17001h_010e', #poverty male 18-24'
+        'b17001h_011e', #poverty male 25-34'
+        'b17001h_012e', #poverty male 35-44'
+        'b17001h_013e', #poverty male 45-54'
+        'b17001h_014e', #poverty male 55-64'
+        'b17001h_015e', #poverty male 65-74'
+        'b17001h_016e', #poverty male 74-inf'
+        'b17001h_024e', #poverty female 18-24'
+        'b17001h_025e', #poverty female 25-34'
+        'b17001h_026e', #poverty female 35-44'
+        'b17001h_027e', #poverty female 45-54'
+        'b17001h_028e', #poverty female 55-64'
+        'b17001h_029e', #poverty female 65-74'
+        'b17001h_030e', #poverty female 74-inf'
+    ]],
     ['hisp' , 'vap', 'poverty', [
         'b17001i_010e', #poverty male 18-24'
         'b17001i_011e', #poverty male 25-34'
@@ -202,22 +207,29 @@ FEATURES = [
         'b17001i_029e', #poverty female 65-74'
         'b17001i_030e', #poverty female 74-inf'
     ]],
-    ['hisp' , 'vap', 'elderly', [
-        'b01001i_013e', #pop male 55-64
-        'b01001i_014e', #pop male 65-74
-        'b01001i_015e', #pop male 75-84
-        'b01001i_016e', #pop male 85-inf  
-        'b01001i_028e', #pop female 55-64
-        'b01001i_029e', #pop female 65-74
-        'b01001i_030e', #pop female 75-84
-        'b01001i_031e', #pop female 85-inf
+
+
+    ['all'  , 'vap', 'highschool', [
+        # 's1501_c01_003e', #High school graduate (includes equivalency) 18-24
+        # 's1501_c01_004e', #Some college or associate's degree 18-24
+        # 's1501_c01_005e', #Bachelor's degree or higher 18-24
+        's1501_c01_009e', #High school graduate (includes equivalency) 25-inf
+        's1501_c01_010e', #Some college, no degree 25-inf
+        's1501_c01_011e', #Associate's degree 25-inf
+        's1501_c01_012e', #Bachelor's degree 25-inf
+        's1501_c01_013e', #Graduate or professional degree 25-inf
     ]],
+    ['white', 'vap', 'highschool', ['s1501_c01_032e']],
     ['hisp' , 'vap', 'highschool', ['s1501_c01_053e']],
+
+
+    ['all'  , 'vap', 'homeowner', ['b25003_002e']],
+    ['white', 'vap', 'homeowner', ['b25003h_002e']],
+    ['hisp' , 'vap', 'homeowner', ['b25003i_002e']],
+
+
     ['hisp' , 'vap', 'spanish_at_home', ['b16004_026e']],
-    ['hisp' , 'vap', 'spanish_at_home_english_well', [
-        'b16004_027e', #speak spanish at home english very well
-        'b16004_028e', #speak spanish at home english well
-    ]],
+    ['hisp' , 'vap', 'spanish_at_home_english_well', ['b16004_027e', 'b16004_028e']],
 ]
 
 FEATURES = pd.DataFrame(FEATURES, columns=['race', 'age', 'var', 'cols'])

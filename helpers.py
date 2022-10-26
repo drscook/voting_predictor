@@ -5,14 +5,14 @@ from google.colab import auth, drive
 from google.cloud import bigquery
 from codetiming import Timer
 
-state = us.states.TX
+STATE = us.states.TX
 
 project_id = 'redistricting-361203'
 repo = 'voting_predictor'
-mount_path = pathlib.Path('/content/drive')
-root_path = mount_path / 'MyDrive/gerrymandering/2022-10'
-repo_path = root_path / repo
-data_path = root_path / f'data/{state.abbr}'
+MOUNT_PATH = pathlib.Path('/content/drive')
+ROOT_PATH = MOUNT_PATH / 'MyDrive/gerrymandering/2022-10'
+REPO_PATH = ROOT_PATH / repo
+DATA_PATH = ROOT_PATH / f'data/{STATE.abbr}'
 
 auth.authenticate_user()
 # drive.mount(str(mount_path))
@@ -40,6 +40,11 @@ def listify(X):
             return list(X)
         except:
             return [X]
+
+def cartesian(D):
+    import itertools as it
+    D = {key: listify(val) for key, val in D.items()}
+    return [dict(zip(D.keys(), x)) for x in it.product(*D.values())]
 
 def to_numeric(ser):
     """converts columns to small numeric dtypes when possible"""
@@ -126,7 +131,7 @@ def download(file, url, unzip=True, overwrite=False):
 
 def pq_(tbl):
     subdir, filename = tbl.split('.')[-2:]
-    return data_path / f'{subdir}/{filename}.parquet'
+    return DATA_PATH / f'{subdir}/{filename}.parquet'
 
 def tbl_(pq):
     dataset, tbl = pq.parts[-2:]
@@ -214,7 +219,7 @@ def get(cols, dataset='acs5', year=2020, level='tract'):
     level_alt = level.replace('_',' ')  # census uses space rather then underscore in block_group here - we must handle and replace
     cols = listify(cols)
     df = prep(pd.DataFrame(conn.get([x.upper() for x in cols], year=year,
-        geo={'for': level_alt+':*', 'in': f'state:{state.fips} county:*'})
+        geo={'for': level_alt+':*', 'in': f'state:{STATE.fips} county:*'})
         )).rename(columns={level_alt: level})
         
     df['year'] = year

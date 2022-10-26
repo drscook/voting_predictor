@@ -6,7 +6,7 @@ def features(year, election='general', office='President', level='tract', overwr
     m_per_mi = 1609.34
     year = int(year)
     get_acs5(year=year, overwrite=overwrite)
-    pq = data_path / f'features/{year}_{election}_{office}.parquet'
+    pq = DATA_PATH / f'features/{year}_{election}_{office}.parquet'
     if pq.is_file() and not overwrite:
         df = pd.read_parquet(pq)
     else:
@@ -49,18 +49,18 @@ def features(year, election='general', office='President', level='tract', overwr
 
         for race in ['all', 'white', 'hisp', 'other']:
             df[f'{race}_vap_density'] = (df[f'{race}_vap_pop'] / df['aland']).fillna(0)
-        df['votes'] = df[elections.columns].sum(axis=1)
-        for party in elections.columns:
-            col = party+'_prop'
-            df[col] = (df[party] / df['all_vap_pop']).clip(0, 1)
-            df[col].fillna(df[col].median(), inplace=True)
+        # df['votes'] = df[elections.columns].sum(axis=1)
+        # for party in elections.columns:
+        #     col = party+'_prop'
+        #     df[col] = (df[party] / df['all_vap_pop'])#.clip(0, 1)
+        #     df[col].fillna(df[col].median(), inplace=True)
 
         for col in df.columns:
             a = col.find('_')+1
             b = col.find('_', a)+1
             subpop = col[:b] + 'pop'
             if col[b:] not in ['pop', 'density'] and subpop in df.columns:
-                df[col] = (df[col] / df[subpop]).clip(0, 1)
+                df[col] = (df[col] / df[subpop])#.clip(0, 1)
                 df[col].fillna(df[col].median(), inplace=True)                
         col = 'hisp_vap_spanish_at_home_english_well'
         df[col] = df[col] / df['hisp_vap_spanish_at_home']
