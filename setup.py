@@ -18,7 +18,9 @@ LONG_DESCRIPTION = 'voting_predictor'
 AUTHOR_NAME = 'Scott Cook'
 AUTHOR_EMAIL = 'scook@tarleton.edu'
 PROJECT_URL = 'https://github.com/voting_predictor'
-REQUIRED_PACKAGES = ['helpers_drscook', 'geopandas']
+# REQUIRED_PACKAGES = ['helpers_drscook', 'geopandas']
+REQUIRED_PACKAGES = ['git+https://github.com/drscook/helpers', 'geopandas']
+
 PROJECT_KEYWORDS = ['pypi', 'python']
 # Read more about classifiers at
 # https://pypi.org/classifiers/
