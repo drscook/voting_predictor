@@ -13,7 +13,7 @@ def download(file, url, unzip=True, overwrite=False):
     if not file.is_file():  # check if file already exists
         print(f'downloading from {url}', end=elipsis)
         ut.mkdir(file.parent)
-        subprocess.run(['wget', '-O', file, url], capture_output=True)
+#         subprocess.run(['wget', '-O', file, url], capture_output=True)
         os.system(f'wget -O {file} {url}')
         print('done!')
     if file.suffix == '.zip' and unzip:
