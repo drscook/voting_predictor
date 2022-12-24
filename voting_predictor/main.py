@@ -1,6 +1,8 @@
 from helpers.common_imports import *
 from helpers import utilities as ut
-import census, us
+import census, us, geopandas as gpd
+from shapely.ops import orient
+
 elipsis = ' ... '
 levels = {
     'state':2,
@@ -9,6 +11,7 @@ levels = {
     'block_group':1,
     'block':4,
 }
+geoid = 'block2020'
 
 def unzipper(file):
     os.system(f'unzip -u -qq -n {file} -d {file.parent}')
@@ -79,11 +82,27 @@ class Redistricter():
                 if abbr == 'VTD':
                     # create vtd id using 3 fips + 6 vtd, pad on left with 0 as needed
                     df['district'] = self.state.fips + ut.rjust(df['countyfp'], 3) + ut.rjust(df['district'], 6)
-                repl = {'blockid': 'block2020', 'district':name}
-                L.append(df[repl.keys()].rename(columns=repl).set_index('block2020'))
+                repl = {'blockid': geoid, 'district':name}
+                L.append(df[repl.keys()].rename(columns=repl).set_index(geoid))
             df = pd.concat(L, axis=1)
             self.bq.df_to_tbl(df, tbl)
         return tbl
+
+    def get_shapes(self, overwrite=False):
+        tbl = f'shapes.{self.state.abbr}'
+        attr = tbl.split('.')[0]
+        self.tbls[attr] = tbl
+        if not self.bq.get_tbl(tbl, overwrite):
+            print(f'getting {tbl}')
+            zip_file = self.data_path / f'tl_2020_{self.state.fips}_tabblock20.zip'
+            url = f'https://www2.census.gov/geo/tiger/TIGER2020/TABBLOCK20/{zip_file.name}'
+            download(zip_file, url, unzip=False)
+            repl = {'geoid20':geoid, 'aland20': 'aland', 'awater20': 'awater', 'geometry':'geometry',}
+            df = ut.prep(gpd.read_file(zip_file))[repl.keys()].rename(columns=repl).to_crs(CRS['bigquery'])
+            df.geometry = df.geometry.buffer(0).apply(orient, args=(1,))
+            # self.bq.df_to_tbl(df, tbl)
+        return tbl, df
+    
 
 
 
