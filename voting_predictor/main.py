@@ -84,7 +84,7 @@ class Redistricter():
                 L.append(df.rename(columns=repl)[repl.values()])
             df = pd.concat(L, axis=1)
             self.bq.df_to_tbl(df, tbl)
-        return tbl
+        return tbl, df
 
 
 
