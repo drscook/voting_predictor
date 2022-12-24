@@ -39,12 +39,15 @@ class Redistricter():
         self.census = census.Census(self.census_api_key)
         self.bq = ut.BigQuery(project_id=self.bg_project_id)
         self.state = us.states.lookup(self.state)
+        self.tbls = dict()
         
     def get_crosswalks(self, overwrite=False):
         tbl = f'crosswalks.{self.state.abbr}'
+        attr = tbl.split('.')[0]
+        self.tbls[attr] = tbl
         if not self.bq.get_tbl(tbl, overwrite):
             print(f'getting {tbl}')
-            zip_file = self.data_path / f'crosswalks/TAB2010_TAB2020_ST{self.state.fips}.zip'
+            zip_file = self.data_path / f'{attr}/TAB2010_TAB2020_ST{self.state.fips}.zip'
             url = f'https://www2.census.gov/geo/docs/maps-data/data/rel2020/t10t20/{zip_file.name}'
             download(zip_file, url)
             txt = zip_file.with_name(f'{zip_file.stem}_{self.state.abbr}.txt'.lower())
@@ -55,4 +58,38 @@ class Redistricter():
                 df[f'prop{yr}'] = df['aland'] / np.fmax(df.groupby(f'block{yr}')['aland'].transform('sum'), 1)
             df = ut.prep(df[['block2010', 'block2020', 'aland', 'prop2010', 'prop2020']])
             self.bq.df_to_tbl(df, tbl)
+        self.tbls[tbl.split('.')[0]] = tbl
         return tbl
+
+    def get_assignments(self, overwrite=False):
+        tbl = f'assignments.{self.state.abbr}'
+        attr = tbl.split('.')[0]
+        self.tbls[attr] = tbl
+        if not self.bq.get_tbl(tbl, overwrite):
+            print(f'getting {tbl}')
+            zip_file = self.data_path / f'{attr}/BlockAssign_ST{self.state.fips}_{self.state.abbr}.zip'
+            url = f'https://www2.census.gov/geo/docs/maps-data/data/baf2020/{zip_file.name}'
+            download(zip_file, url)
+            d = {'VTD':'vtd2020', 'CD':'congress2010', 'SLDU':'senate2010', 'SLDL':'house2010'}
+            L = []
+            for abbr, name in d.items():
+                # tbl_raw = f'{tbl}_{name}'
+                # if not self.bq.get_tbl(tbl_raw, overwrite):
+                f = zip_file.parent / f'{zip_file.stem}_{abbr}.txt'
+                df = prep(pd.read_csv(f, sep='|'))
+                if abbr == 'VTD':
+                    # create vtd id using 3 fips + 6 vtd, pad on left with 0 as needed
+                    df['district'] = self.state.fips + ut.rjust(df['countyfp'], 3) + ut.rjust(df['district'], 6)
+                repl = {'blockid': geoid, 'district':name}
+                L.append(df.rename(columns=repl)[repl.values()])
+            df = pd.concat(L, axis=1)
+            self.bq.df_to_tbl(df, tbl)
+        return tbl
+
+
+
+    # def get_shapes(self, overwrite=False):
+    #     attr = 'shapes'
+    #     tbl = f'{attr}.{self.state.abbr}'
+    #     self.tbls[attr] = tbl
+    #     if not self.bq.get_tbl(tbl, overwrite):
