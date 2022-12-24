@@ -14,7 +14,7 @@ def download(file, url, unzip=True, overwrite=False):
         print(f'downloading from {url}', end=elipsis)
         ut.mkdir(file.parent)
         subprocess.run(['wget', '-O', file, url], capture_output=True)
-        os.system(f'wget -O {file} {url})
+        os.system(f'wget -O {file} {url}')
         print('done!')
     if file.suffix == '.zip' and unzip:
         unzipper(file)
