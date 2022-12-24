@@ -9,13 +9,6 @@ levels = {
     'block':4,
 }
 
-crs = {
-    'census'  : 'EPSG:4269'  , # degrees - used by Census
-    'bigquery': 'EPSG:4326'  , # WSG84 - used by Bigquery
-    'area'    : 'ESRI:102003', # meters
-    'length'  : 'ESRI:102005', # meters
-}
-
 def unzipper(file):
     os.system(f'unzip -u -qq -n {file} -d {file.parent}')
 
