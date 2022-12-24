@@ -60,7 +60,7 @@ class Redistricter():
             df = ut.prep(pd.read_csv(txt, sep='|')).rename(columns={'arealand_int': 'aland'})
             for yr in [2010, 2020]:
                 L = [ut.rjust(df[f'{l}_{yr}'], d) for l, d in levels.items() if l != 'block_group']
-                df[f'block{yr}'] = L[0] + L[1] + L[2] + L[3])
+                df[f'block{yr}'] = L[0] + L[1] + L[2] + L[3]
                 df[f'prop{yr}'] = df['aland'] / np.fmax(df.groupby(f'block{yr}')['aland'].transform('sum'), 1)
             df = ut.prep(df[['block2010', 'block2020', 'aland', 'prop2010', 'prop2020']])
             self.bq.df_to_table(df, tbl)
