@@ -74,18 +74,16 @@ class Redistricter():
             d = {'VTD':'vtd2020', 'CD':'congress2010', 'SLDU':'senate2010', 'SLDL':'house2010'}
             L = []
             for abbr, name in d.items():
-                # tbl_raw = f'{tbl}_{name}'
-                # if not self.bq.get_tbl(tbl_raw, overwrite):
                 f = zip_file.parent / f'{zip_file.stem}_{abbr}.txt'
                 df = ut.prep(pd.read_csv(f, sep='|'))
                 if abbr == 'VTD':
                     # create vtd id using 3 fips + 6 vtd, pad on left with 0 as needed
                     df['district'] = self.state.fips + ut.rjust(df['countyfp'], 3) + ut.rjust(df['district'], 6)
                 repl = {'blockid': 'block2020', 'district':name}
-                L.append(df.rename(columns=repl)[repl.values()])
+                L.append(df[repl.keys()].rename(columns=repl).set_index('block2020'))
             df = pd.concat(L, axis=1)
-            # self.bq.df_to_tbl(df, tbl)
-        return tbl, df
+            self.bq.df_to_tbl(df, tbl)
+        return tbl
 
 
 
