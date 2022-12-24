@@ -61,7 +61,7 @@ class Redistricter():
                 df[f'block{yr}'] = L[0] + L[1] + L[2] + L[3]
                 df[f'prop{yr}'] = df['aland'] / np.fmax(df.groupby(f'block{yr}')['aland'].transform('sum'), 1)
             df = ut.prep(df[['block2010', 'block2020', 'aland', 'prop2010', 'prop2020']])
-            self.bq.df_to_table(df, tbl)
+            self.bq.df_to_tbl(df, tbl)
         return tbl
             
             
