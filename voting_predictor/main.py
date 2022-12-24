@@ -10,4 +10,4 @@ class Redistricter():
     def __post_init__(self):
         self.census = census.Census(self.census_api_key)
 #         self.bq = ut.BigQuery(project_id=self.bg_project_id)
-        self.state = us.STATES.lookup(self.state)
+        self.state = us.states.lookup(self.state)
