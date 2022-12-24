@@ -6,7 +6,7 @@ levels = {
     'county':3,
     'tract':6,
     'block_group':1,
-    'block':4,
+    'blk':4,
 }
 
 crs = {
@@ -17,7 +17,6 @@ crs = {
 }
 
 def unzipper(file):
-#     subprocess.run(['unzip', '-u', '-qq', '-n', file, '-d', file.parent], capture_output=True)
     os.system(f'unzip -u -qq -n {file} -d {file.parent}')
 
 def download(file, url, unzip=True, overwrite=False):
@@ -27,7 +26,6 @@ def download(file, url, unzip=True, overwrite=False):
     if not file.is_file():  # check if file already exists
         print(f'downloading from {url}', end=elipsis)
         ut.mkdir(file.parent)
-#         subprocess.run(['wget', '-O', file, url], capture_output=True)
         os.system(f'wget -O {file} {url}')
         print('done!')
     if file.suffix == '.zip' and unzip:
