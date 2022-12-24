@@ -29,7 +29,7 @@ class Redistricter():
     
     def __post_init__(self):
         self.root_path = pathlib.Path(self.root_path)
-        self.data_path = root_path / 'data'
+        self.data_path = self.root_path / 'data'
         self.data_path.mkdir(parents=True, exist_ok=True)
         self.census = census.Census(self.census_api_key)
         self.bq = ut.BigQuery(project_id=self.bg_project_id)
