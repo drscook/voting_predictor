@@ -80,7 +80,7 @@ class Redistricter():
                 if abbr == 'VTD':
                     # create vtd id using 3 fips + 6 vtd, pad on left with 0 as needed
                     df['district'] = self.state.fips + ut.rjust(df['countyfp'], 3) + ut.rjust(df['district'], 6)
-                repl = {'blockid': geoid, 'district':name}
+                repl = {'blockid': 'block2020', 'district':name}
                 L.append(df.rename(columns=repl)[repl.values()])
             df = pd.concat(L, axis=1)
             self.bq.df_to_tbl(df, tbl)
