@@ -76,7 +76,7 @@ class Redistricter():
                 # tbl_raw = f'{tbl}_{name}'
                 # if not self.bq.get_tbl(tbl_raw, overwrite):
                 f = zip_file.parent / f'{zip_file.stem}_{abbr}.txt'
-                df = prep(pd.read_csv(f, sep='|'))
+                df = ut.prep(pd.read_csv(f, sep='|'))
                 if abbr == 'VTD':
                     # create vtd id using 3 fips + 6 vtd, pad on left with 0 as needed
                     df['district'] = self.state.fips + ut.rjust(df['countyfp'], 3) + ut.rjust(df['district'], 6)
