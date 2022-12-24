@@ -36,7 +36,7 @@ class Redistricter():
         self.state = us.states.lookup(self.state)
         
     def get_crosswalks(self, overwrite=False):
-        tbl = f'crosswalks.{STATE.abbr}'
+        tbl = f'crosswalks.{self.state.abbr}'
         if not self.bq.get_tbl(tbl, overwrite):
             print(f'getting {tbl}')
             zip_file = self.data_path / f'TAB2010_TAB2020_ST{self.state.fips}.zip'
