@@ -1,4 +1,5 @@
 from . import *
+import census, us
 
 @dataclasses.dataclass
 class Redistricter():
