@@ -55,7 +55,7 @@ class Redistricter():
             url = f'https://www2.census.gov/geo/docs/maps-data/data/rel2020/t10t20/{zip_file.name}'
             download(zip_file, url)
             txt = zip_file.with_name(f'{zip_file.stem}_{self.state.abbr}.txt'.lower())
-            df = ut.prep(pd.read_csv(txt, sep='|')).rename(columns={'arealand_int': 'aland', 'block_2010': 'blk_2010', 'block_2020': 'blk_2020'})
+            df = ut.prep(pd.read_csv(txt, sep='|')).rename(columns={'arealand_int': 'aland', 'blk_2010': 'block_2010', 'blk_2020': 'block_2020'})
             for yr in [2010, 2020]:
                 L = [ut.rjust(df[f'{l}_{yr}'], d) for l, d in levels.items() if l != 'block_group']
                 df[f'block{yr}'] = L[0] + L[1] + L[2] + L[3]
