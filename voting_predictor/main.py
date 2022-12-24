@@ -1,6 +1,20 @@
 from . import *
 import census, us
 elipsis = ' ... '
+levels = {
+    'state':2,
+    'county':3,
+    'tract':6,
+    'block_group':1,
+    'block':4,
+}
+
+crs = {
+    'census'  : 'EPSG:4269'  , # degrees - used by Census
+    'bigquery': 'EPSG:4326'  , # WSG84 - used by Bigquery
+    'area'    : 'ESRI:102003', # meters
+    'length'  : 'ESRI:102005', # meters
+}
 
 def unzipper(file):
 #     subprocess.run(['unzip', '-u', '-qq', '-n', file, '-d', file.parent], capture_output=True)
@@ -39,9 +53,12 @@ class Redistricter():
         tbl = f'crosswalks.{self.state.abbr}'
         if not self.bq.get_tbl(tbl, overwrite):
             print(f'getting {tbl}')
-            zip_file = self.data_path / f'TAB2010_TAB2020_ST{self.state.fips}.zip'
+            zip_file = self.data_path / f'crosswalks/TAB2010_TAB2020_ST{self.state.fips}.zip'
             url = f'https://www2.census.gov/geo/docs/maps-data/data/rel2020/t10t20/{zip_file.name}'
             download(zip_file, url)
+            txt = zip_file.with_name(f'{zip_file.stem}_{STATE.abbr}.txt'.lower())
+            df = ut.prep(pd.read_csv(txt, sep='|')).rename(columns={'arealand_int': 'aland'})
+        return df
             
             
             
