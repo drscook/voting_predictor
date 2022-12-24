@@ -39,7 +39,7 @@ class Redistricter():
         tbl = f'crosswalks.{STATE.abbr}'
         if not self.bq.get_tbl(tbl, overwrite):
             print(f'getting {tbl}')
-            zip_file = self.data_path / f'TAB2010_TAB2020_ST{STATE.fips}.zip'
+            zip_file = self.data_path / f'TAB2010_TAB2020_ST{self.state.fips}.zip'
             url = f'https://www2.census.gov/geo/docs/maps-data/data/rel2020/t10t20/{zip_file.name}'
             download(zip_file, url)
             
