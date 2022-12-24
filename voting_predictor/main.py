@@ -56,7 +56,7 @@ class Redistricter():
             zip_file = self.data_path / f'crosswalks/TAB2010_TAB2020_ST{self.state.fips}.zip'
             url = f'https://www2.census.gov/geo/docs/maps-data/data/rel2020/t10t20/{zip_file.name}'
             download(zip_file, url)
-            txt = zip_file.with_name(f'{zip_file.stem}_{STATE.abbr}.txt'.lower())
+            txt = zip_file.with_name(f'{zip_file.stem}_{self.state.abbr}.txt'.lower())
             df = ut.prep(pd.read_csv(txt, sep='|')).rename(columns={'arealand_int': 'aland'})
         return df
             
