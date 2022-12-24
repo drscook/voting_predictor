@@ -56,7 +56,3 @@ class Redistricter():
             df = ut.prep(df[['block2010', 'block2020', 'aland', 'prop2010', 'prop2020']])
             self.bq.df_to_tbl(df, tbl)
         return tbl
-            
-            
-            
-        
