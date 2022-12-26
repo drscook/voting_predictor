@@ -153,7 +153,7 @@ class Redistricter():
         return tbl
 
     @codetiming.Timer()
-    def get_shapes(self, overwrite=False):
+    def get_shapes(self, year=2020, overwrite=False):
         dec = get_decade(year)
         geoid = f'block{dec}'
         tbl = f'shapes.{self.state.abbr}{dec}'
@@ -170,7 +170,10 @@ class Redistricter():
             repl = {'geoid{d}':geoid, 'aland{d}': 'aland', 'awater{d}': 'awater', 'geometry':'geometry',}
             download(zip_file, url, unzip=False)
             repl = {'geoid20':geoid, 'aland20': 'aland', 'awater20': 'awater', 'geometry':'geometry',}
+            df = ut.prep(gpd.read_file(zip_file))
+            display(df.head(3))
             df = ut.prep(gpd.read_file(zip_file))[repl.keys()].rename(columns=repl).to_crs(crs['bigquery'])
+
             df.geometry = df.geometry.buffer(0).apply(orient, args=(1,))
             self.bq.df_to_tbl(df, tbl)
         return tbl
