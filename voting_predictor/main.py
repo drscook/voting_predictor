@@ -2,6 +2,8 @@ from helpers.common_imports import *
 from helpers import utilities as ut
 import census, us, geopandas as gpd
 from shapely.ops import orient
+warnings.filterwarnings('ignore', message='.*ShapelyDeprecationWarning.*')
+warnings.simplefilter(action='ignore', category=FutureWarning)
 
 geoid = 'block2020'
 elipsis = ' ... '
