@@ -93,28 +93,37 @@ class Redistricter():
         geoid = get_geoid(df)
         return ut.prep(df[['year', geoid, *ut.prep(fields)]])
 
-    @codetiming.Timer()
-    def combine(self, year=2020, overwrite=False):
-
-        tbl = f'combine.{self.state.abbr}'
+    def get_path(self, tbl):
         attr = tbl.split('.')[0]
         self.tbls[attr] = tbl
+        return self.data_path / attr
+
+    @codetiming.Timer()
+    def combine(self, year=2020, overwrite=False):
+        dec = get_decade(year)
+        geoid = f'block{dec}'
+        tbl = f'combine.{self.state.abbr}{dec}'
+        path = self.get_path(tbl)
         if not self.bq.get_tbl(tbl, overwrite):
-            self.get_assignments()
-            self.get_shapes()
-            print(f'getting {tbl}')
+            self.get_assignments(year)
+            self.get_shapes(year)
+            self.get_pl(year)
+            print(f'{tbl} fetching', end=elipsis)
             qry = f"""
 select
     *
---    A.*,
-    --B.* (except {geoid}),
 from
     {self.tbls['assignments']} as A
 inner join
+    {self.tbls['pl']} as P
+using
+    ({geoid})
+inner join
     {self.tbls['shapes']} as S
 using
-    {geoid}
+    ({geoid})
 """
+            print(qry)
             self.bq.qry_to_tbl(qry, tbl)
         return tbl
 
@@ -124,18 +133,17 @@ using
         dec = get_decade(year)
         geoid = f'block{dec}'
         tbl = f'pl.{self.state.abbr}{dec}'
-        attr = tbl.split('.')[0]
-        self.tbls[attr] = tbl
-        print(f'{tbl}', end=elipsis)
+        path = self.get_path(tbl)
         if not self.bq.get_tbl(tbl, overwrite):
-            print('fetching', end=elipsis)
+            print(f'{tbl} fetching', end=elipsis)
             df = self.fetch_census(fields=['name', *subpops.keys()], dataset='pl', year=dec, level='block')
             df['county'] = df['name'].str.split(', ', expand=True)[3].str[:-7]
             df = df.rename(columns=subpops)[[geoid, 'county', *subpops.values()]]
             compute_other(df, 'tot_pop')
             compute_other(df, 'vap_pop')
             self.bq.df_to_tbl(df, tbl)
-        return tbl, df
+        print(tbl, end=elipsis)
+        return tbl
 
 
 
@@ -144,17 +152,16 @@ using
         dec = get_decade(year)
         geoid = f'block{dec}'
         tbl = f'assignments.{self.state.abbr}{dec}'
-        attr = tbl.split('.')[0]
-        self.tbls[attr] = tbl
-        print(f'{tbl}', end=elipsis)
+        path = self.get_path(tbl)
         if not self.bq.get_tbl(tbl, overwrite):
-            print('fetching', end=elipsis)
-            zip_file = self.data_path / f'{attr}/BlockAssign_ST{self.state.fips}_{self.state.abbr}.zip'
+            print(f'{tbl} fetching', end=elipsis)
+            zip_file = path / f'BlockAssign_ST{self.state.fips}_{self.state.abbr}.zip'
             if dec == 2010:
                 url = f'https://www2.census.gov/geo/docs/maps-data/data/baf/{zip_file.name}'
             elif dec == 2020:
                 url = f'https://www2.census.gov/geo/docs/maps-data/data/baf{dec}/{zip_file.name}'
             download(zip_file, url)
+
             dist = {'VTD':f'vtd{dec}', 'CD':f'congress{dec-10}', 'SLDU':f'senate{dec-10}', 'SLDL':f'house{dec-10}'}
             L = []
             for abbr, name in dist.items():
@@ -167,6 +174,7 @@ using
                 L.append(df.rename(columns=repl)[repl.values()].set_index(geoid))
             df = pd.concat(L, axis=1)
             self.bq.df_to_tbl(df, tbl)
+        print(tbl, end=elipsis)
         return tbl
 
     @codetiming.Timer()
@@ -174,13 +182,11 @@ using
         dec = get_decade(year)
         geoid = f'block{dec}'
         tbl = f'shapes.{self.state.abbr}{dec}'
-        attr = tbl.split('.')[0]
-        self.tbls[attr] = tbl
-        print(f'{tbl}', end=elipsis)
+        path = self.get_path(tbl)
         if not self.bq.get_tbl(tbl, overwrite):
-            print('fetching', end=elipsis)
+            print(f'{tbl} fetching', end=elipsis)
             d = dec % 100
-            zip_file = self.data_path / f'tl_{dec}_{self.state.fips}_tabblock{d}.zip'
+            zip_file = path / f'tl_{dec}_{self.state.fips}_tabblock{d}.zip'
             if dec == 2010:
                 url = f'https://www2.census.gov/geo/tiger/TIGER{dec}/TABBLOCK/{dec}/{zip_file.name}'
             elif dec == 2020:
@@ -191,18 +197,17 @@ using
             df = ut.prep(gpd.read_file(zip_file)).rename(columns=repl)[repl.values()].to_crs(crs['bigquery'])
             df.geometry = df.geometry.buffer(0).apply(orient, args=(1,))
             self.bq.df_to_tbl(df, tbl)
+        print(tbl, end=elipsis)
         return tbl
 
 
     @codetiming.Timer()
     def get_crosswalks(self, overwrite=False):
         tbl = f'crosswalks.{self.state.abbr}'
-        attr = tbl.split('.')[0]
-        self.tbls[attr] = tbl
-        print(f'{tbl}', end=elipsis)
+        path = self.get_path(tbl)
         if not self.bq.get_tbl(tbl, overwrite):
-            print('fetching', end=elipsis)
-            zip_file = self.data_path / f'{attr}/TAB2010_TAB2020_ST{self.state.fips}.zip'
+            print(f'{tbl} fetching', end=elipsis)
+            zip_file = path / f'TAB2010_TAB2020_ST{self.state.fips}.zip'
             url = f'https://www2.census.gov/geo/docs/maps-data/data/rel2020/t10t20/{zip_file.name}'
             download(zip_file, url)
             
@@ -214,6 +219,7 @@ using
             df = ut.prep(df[['block2010', 'block2020', 'aland', 'prop2010', 'prop2020']])
             self.bq.df_to_tbl(df, tbl)
         self.tbls[tbl.split('.')[0]] = tbl
+        print(tbl, end=elipsis)
         return tbl
 
 
