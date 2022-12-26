@@ -56,7 +56,13 @@ def get_geoid(df, year=2020):
             if col in df:
                 df[geoid] += ut.rjust(df[col], k)
                 break
-    return df, geoid
+    return geoid
+
+def compute_other(df, feat):
+    try:
+        df['other_'+feat] = df['all_'+feat] - df['white_'+feat] - df['hisp_'+feat]
+    except KeyError:
+        print(f'Can not compute other_{feat}')
 
 @dataclasses.dataclass
 class Redistricter():
@@ -74,7 +80,7 @@ class Redistricter():
         self.state = us.states.lookup(self.state)
         self.tbls = dict()
         
-    def get_census(self, fields, dataset='acs5', year=2020, level='tract'):
+    def fetch_census(self, fields, dataset='acs5', year=2020, level='tract'):
         conn = getattr(self.census_session, dataset)
         fields = ut.prep(ut.listify(fields), mode='upper')
         if not 'NAME' in fields:
@@ -83,22 +89,35 @@ class Redistricter():
         df = ut.prep(pd.DataFrame(
             conn.get(fields=fields, year=year, geo={'for': level_alt+':*', 'in': f'state:{self.state.fips} county:*'})
         )).rename(columns={level_alt: level})
-        display(df.head(3))
         df['year'] = year
-        df, geoid = get_geoid(df)
-        display(df.head(3))
-
-        # if year >= 2020:
-        #     geoid = level+'2020'
-        # else:
-        #     geoid = level+'2010'
-        # df[geoid] = ''
-        # for level, k in levels.items():
-        #     if level in df:
-        #         # df[geoid] += df[level].astype(str).str.rjust(k, '0')
-        #         df[geoid] += ut.rjust(df[level], k)
-        # assert not df.isnull().any().any(), 'null values detected'
+        geoid = get_geoid(df)
         return ut.prep(df[['year', geoid, *ut.prep(fields)]])
+
+    @codetiming.Timer()
+    def combine(self, year=2020, overwrite=False):
+
+        tbl = f'combine.{self.state.abbr}'
+        attr = tbl.split('.')[0]
+        self.tbls[attr] = tbl
+        if not self.bq.get_tbl(tbl, overwrite):
+            self.get_assignments()
+            self.get_shapes()
+            print(f'getting {tbl}')
+            qry = f"""
+select
+    *
+--    A.*,
+    --B.* (except {geoid}),
+from
+    {self.tbls['assignments']} as A
+inner join
+    {self.tbls['shapes']} as S
+using
+    {geoid}
+"""
+            self.bq.qry_to_tbl(qry, tbl)
+        return tbl
+
 
     @codetiming.Timer()
     def get_pl(self, year=2020, overwrite=False):
@@ -110,40 +129,15 @@ class Redistricter():
         print(f'{tbl}', end=elipsis)
         if not self.bq.get_tbl(tbl, overwrite):
             print('fetching', end=elipsis)
-            df = self.get_census(
-                fields = ['name', *subpops.keys()],
-                dataset = 'pl',
-                year = 2020,
-                level = 'block')
+            df = self.fetch_census(fields=['name', *subpops.keys()], dataset='pl', year=dec, level='block')
             df['county'] = df['name'].str.split(', ', expand=True)[3].str[:-7]
             df = df.rename(columns=subpops)[[geoid, 'county', *subpops.values()]]
+            compute_other(df, 'tot_pop')
+            compute_other(df, 'vap_pop')
+            self.bq.df_to_tbl(df, tbl)
         return tbl, df
 
 
-    @codetiming.Timer()
-    def get_crosswalks(self, overwrite=False):
-        tbl = f'crosswalks.{self.state.abbr}'
-        attr = tbl.split('.')[0]
-        self.tbls[attr] = tbl
-        print(f'{tbl}', end=elipsis)
-        if not self.bq.get_tbl(tbl, overwrite):
-            print('fetching', end=elipsis)
-            zip_file = self.data_path / f'{attr}/TAB2010_TAB2020_ST{self.state.fips}.zip'
-            url = f'https://www2.census.gov/geo/docs/maps-data/data/rel2020/t10t20/{zip_file.name}'
-            download(zip_file, url)
-            
-            txt = zip_file.with_name(f'{zip_file.stem}_{self.state.abbr}.txt'.lower())
-            df = ut.prep(pd.read_csv(txt, sep='|')).rename(columns={'arealand_int': 'aland', 'blk_2010': 'block_2010', 'blk_2020': 'block_2020'})
-            for dec in [2010, 2020]:
-                df, geoid = get_geoid(df, dec)
-
-                # L = [ut.rjust(df[f'{l}_{yr}'], d) for l, d in levels.items() if l != 'block_group']
-                # df[f'block{yr}'] = L[0] + L[1] + L[2] + L[3]
-                df[f'prop{dec}'] = df['aland'] / np.fmax(df.groupby(geoid)['aland'].transform('sum'), 1)
-            df = ut.prep(df[['block2010', 'block2020', 'aland', 'prop2010', 'prop2020']])
-            self.bq.df_to_tbl(df, tbl)
-        self.tbls[tbl.split('.')[0]] = tbl
-        return tbl
 
     @codetiming.Timer()
     def get_assignments(self, year=2020, overwrite=False):
@@ -191,8 +185,8 @@ class Redistricter():
                 url = f'https://www2.census.gov/geo/tiger/TIGER{dec}/TABBLOCK/{dec}/{zip_file.name}'
             elif dec == 2020:
                 url = f'https://www2.census.gov/geo/tiger/TIGER{dec}/TABBLOCK{d}/{zip_file.name}'
-            repl = {'geoid{d}':geoid, 'aland{d}': 'aland', 'awater{d}': 'awater', 'geometry':'geometry',}
             download(zip_file, url, unzip=False)
+
             repl = {'geoid20':geoid, 'aland20': 'aland', 'awater20': 'awater', 'geometry':'geometry',}
             df = ut.prep(gpd.read_file(zip_file))[repl.keys()].rename(columns=repl).to_crs(crs['bigquery'])
             df.geometry = df.geometry.buffer(0).apply(orient, args=(1,))
@@ -200,31 +194,29 @@ class Redistricter():
         return tbl
 
 
-
-
     @codetiming.Timer()
-    def combine(self, overwrite=False):
-        tbl = f'combine.{self.state.abbr}'
+    def get_crosswalks(self, overwrite=False):
+        tbl = f'crosswalks.{self.state.abbr}'
         attr = tbl.split('.')[0]
         self.tbls[attr] = tbl
+        print(f'{tbl}', end=elipsis)
         if not self.bq.get_tbl(tbl, overwrite):
-            self.get_assignments()
-            self.get_shapes()
-            print(f'getting {tbl}')
-            qry = f"""
-select
-    *
---    A.*,
-    --B.* (except {geoid}),
-from
-    {self.tbls['assignments']} as A
-inner join
-    {self.tbls['shapes']} as S
-using
-    {geoid}
-"""
-            self.bq.qry_to_tbl(qry, tbl)
+            print('fetching', end=elipsis)
+            zip_file = self.data_path / f'{attr}/TAB2010_TAB2020_ST{self.state.fips}.zip'
+            url = f'https://www2.census.gov/geo/docs/maps-data/data/rel2020/t10t20/{zip_file.name}'
+            download(zip_file, url)
+            
+            txt = zip_file.with_name(f'{zip_file.stem}_{self.state.abbr}.txt'.lower())
+            df = ut.prep(pd.read_csv(txt, sep='|')).rename(columns={'arealand_int': 'aland', 'blk_2010': 'block_2010', 'blk_2020': 'block_2020'})
+            for dec in [2010, 2020]:
+                geoid = get_geoid(df, dec)
+                df[f'prop{dec}'] = df['aland'] / np.fmax(df.groupby(geoid)['aland'].transform('sum'), 1)
+            df = ut.prep(df[['block2010', 'block2020', 'aland', 'prop2010', 'prop2020']])
+            self.bq.df_to_tbl(df, tbl)
+        self.tbls[tbl.split('.')[0]] = tbl
         return tbl
+
+
 
 
     # def get_shapes(self, overwrite=False):
