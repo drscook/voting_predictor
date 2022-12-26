@@ -108,8 +108,8 @@ class Redistricter():
             repl = {'geoid20':geoid, 'aland20': 'aland', 'awater20': 'awater', 'geometry':'geometry',}
             df = ut.prep(gpd.read_file(zip_file))[repl.keys()].rename(columns=repl).to_crs(CRS['bigquery'])
             df.geometry = df.geometry.buffer(0).apply(orient, args=(1,))
-            # self.bq.df_to_tbl(df, tbl)
-        return tbl, df
+            self.bq.df_to_tbl(df, tbl)
+        return tbl
     
 
 
