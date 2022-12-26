@@ -133,15 +133,14 @@ class Redistricter():
         if not self.bq.get_tbl(tbl, overwrite):
             print(f'getting {tbl}')
             zip_file = self.data_path / f'{attr}/BlockAssign_ST{self.state.fips}_{self.state.abbr}.zip'
-            if dec = 2010:
+            if dec == 2010:
                 url = f'https://www2.census.gov/geo/docs/maps-data/data/baf/{zip_file.name}'
             elif dec == 2020:
                 url = f'https://www2.census.gov/geo/docs/maps-data/data/baf{dec}/{zip_file.name}'
             download(zip_file, url)
-            d = {'VTD':f'vtd{dec}', 'CD':f'congress{dec-10}', 'SLDU':f'senate{dec-10}', 'SLDL':f'house{dec-10}'}
+            dist = {'VTD':f'vtd{dec}', 'CD':f'congress{dec-10}', 'SLDU':f'senate{dec-10}', 'SLDL':f'house{dec-10}'}
             L = []
-            geoid = ''
-            for abbr, name in d.items():
+            for abbr, name in dist.items():
                 f = zip_file.parent / f'{zip_file.stem}_{abbr}.txt'
                 df = ut.prep(pd.read_csv(f, sep='|'))
                 if abbr == 'VTD':
