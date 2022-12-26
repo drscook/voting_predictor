@@ -37,6 +37,28 @@ def download(file, url, unzip=True, overwrite=False):
         unzipper(file)
     return file
 
+def get(cols, dataset='acs5', year=2020, level='tract'):
+    print(f'fetching data from {dataset}', end=elipsis)
+    conn = getattr(census_session, dataset)
+    level_alt = level.replace('_',' ')  # census uses space rather then underscore in block_group here - we must handle and replace
+    cols = listify(cols)
+    df = prep(pd.DataFrame(conn.get([x.upper() for x in cols], year=year,
+        geo={'for': level_alt+':*', 'in': f'state:{STATE.fips} county:*'})
+        )).rename(columns={level_alt: level})
+        
+    df['year'] = year
+    if year >= 2020:
+        geoid = level+'2020'
+    else:
+        geoid = level+'2010'
+    df[geoid] = ''
+    for level, k in LEVELS.items():
+        if level in df:
+            df[geoid] += df[level].astype(str).str.rjust(k, '0')
+    # assert not df.isnull().any().any(), 'null values detected'
+    print('done!')
+    return prep(df[['year', geoid, *cols]])
+
 @dataclasses.dataclass
 class Redistricter():
     census_api_key: str
@@ -96,6 +118,7 @@ class Redistricter():
             self.bq.df_to_tbl(df, tbl)
         return tbl
 
+    @Timer()
     def get_shapes(self, overwrite=False):
         tbl = f'shapes.{self.state.abbr}'
         attr = tbl.split('.')[0]
@@ -110,6 +133,15 @@ class Redistricter():
             df.geometry = df.geometry.buffer(0).apply(orient, args=(1,))
             self.bq.df_to_tbl(df, tbl)
         return tbl
+    
+    def get_2020(self, overwrite=False):
+        tbl = f'2020.{self.state.abbr}'
+        attr = tbl.split('.')[0]
+        self.tbls[attr] = tbl
+        if not self.bq.get_tbl(tbl, overwrite):
+            print(f'getting {tbl}')
+            df = get(['name', *SUBPOPS.keys()], 'pl', year, level)
+   
     
 
 
