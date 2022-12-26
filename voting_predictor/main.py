@@ -5,7 +5,6 @@ from shapely.ops import orient
 warnings.filterwarnings('ignore', message='.*ShapelyDeprecationWarning.*')
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
-geoid = 'block2020'
 elipsis = ' ... '
 levels = {
     'state':2,
@@ -29,6 +28,9 @@ subpops = {
     'p4_002n': 'hisp_vap_pop',
 }
 
+def get_decade(year):
+    return int(year) // 10 * 10
+
 def unzipper(file):
     os.system(f'unzip -u -qq -n {file} -d {file.parent}')
 
@@ -45,7 +47,16 @@ def download(file, url, unzip=True, overwrite=False):
         unzipper(file)
     return file
 
-
+def get_geoid(df, year=2020):
+    dec = str(get_decade(year))
+    geoid = 'block'+dec
+    df[geoid] = ''
+    for level, k in levels.items():
+        for col in [level, level+dec, level+'_'+dec]:
+            if col in df:
+                df[geoid] += ut.rjust(df[col], k)
+                break
+    return df, geoid
 
 @dataclasses.dataclass
 class Redistricter():
@@ -63,28 +74,30 @@ class Redistricter():
         self.state = us.states.lookup(self.state)
         self.tbls = dict()
         
-    def get_census(self, cols, dataset='acs5', year=2020, level='tract'):
+    def get_census(self, fields, dataset='acs5', year=2020, level='tract'):
         print(f'fetching data from {dataset}', end=elipsis)
-        cols = ut.listify(cols)
         conn = getattr(self.census_session, dataset)
-        level_alt = level.replace('_', ' ')  # census uses space rather then underscore in block_group here - we must handle and replace
+        fields = ut.prep(fields, mode='upper')
         
-        df = ut.prep(pd.DataFrame(conn.get([x.upper() for x in cols], year=year,
-            geo={'for': level_alt+':*', 'in': f'state:{STATE.fips} county:*'})
-            )).rename(columns={level_alt: level})
-
+        level_alt = level.replace('_', ' ')  # census uses space rather then underscore in block_group here - we must handle and replace
+        df = ut.prep(pd.DataFrame(
+            conn(fields=fields, year=year, geo={'for': level_alt+':*', 'in': f'state:{self.state.fips} county:*'})
+        )).rename(columns={level_alt: level})
         df['year'] = year
-        if year >= 2020:
-            geoid = level+'2020'
-        else:
-            geoid = level+'2010'
-        df[geoid] = ''
-        for level, k in LEVELS.items():
-            if level in df:
-                df[geoid] += df[level].astype(str).str.rjust(k, '0')
+        df, geoid = get_geoid(df)
+
+        # if year >= 2020:
+        #     geoid = level+'2020'
+        # else:
+        #     geoid = level+'2010'
+        # df[geoid] = ''
+        # for level, k in levels.items():
+        #     if level in df:
+        #         # df[geoid] += df[level].astype(str).str.rjust(k, '0')
+        #         df[geoid] += ut.rjust(df[level], k)
         # assert not df.isnull().any().any(), 'null values detected'
         print('done!')
-        return prep(df[['year', geoid, *cols]])
+        return ut.prep(df[['year', geoid, *fields]])
         
     @codetiming.Timer()
     def get_crosswalks(self, overwrite=False):
@@ -99,28 +112,35 @@ class Redistricter():
             
             txt = zip_file.with_name(f'{zip_file.stem}_{self.state.abbr}.txt'.lower())
             df = ut.prep(pd.read_csv(txt, sep='|')).rename(columns={'arealand_int': 'aland', 'blk_2010': 'block_2010', 'blk_2020': 'block_2020'})
-            for yr in [2010, 2020]:
-                L = [ut.rjust(df[f'{l}_{yr}'], d) for l, d in levels.items() if l != 'block_group']
-                df[f'block{yr}'] = L[0] + L[1] + L[2] + L[3]
-                df[f'prop{yr}'] = df['aland'] / np.fmax(df.groupby(f'block{yr}')['aland'].transform('sum'), 1)
+            for dec in [2010, 2020]:
+                df, geoid = get_geoid(df, dec)
+
+                # L = [ut.rjust(df[f'{l}_{yr}'], d) for l, d in levels.items() if l != 'block_group']
+                # df[f'block{yr}'] = L[0] + L[1] + L[2] + L[3]
+                df[f'prop{dec}'] = df['aland'] / np.fmax(df.groupby(geoid)['aland'].transform('sum'), 1)
             df = ut.prep(df[['block2010', 'block2020', 'aland', 'prop2010', 'prop2020']])
             self.bq.df_to_tbl(df, tbl)
         self.tbls[tbl.split('.')[0]] = tbl
         return tbl
 
     @codetiming.Timer()
-    def get_assignments(self, overwrite=False):
-        tbl = f'assignments.{self.state.abbr}'
+    def get_assignments(self, year=2020, overwrite=False):
+        dec = get_decade(year)
+        geoid = f'block{dec}'
+        tbl = f'assignments.{self.state.abbr}{dec}'
         attr = tbl.split('.')[0]
         self.tbls[attr] = tbl
         if not self.bq.get_tbl(tbl, overwrite):
             print(f'getting {tbl}')
             zip_file = self.data_path / f'{attr}/BlockAssign_ST{self.state.fips}_{self.state.abbr}.zip'
-            url = f'https://www2.census.gov/geo/docs/maps-data/data/baf2020/{zip_file.name}'
+            if dec = 2010:
+                url = f'https://www2.census.gov/geo/docs/maps-data/data/baf/{zip_file.name}'
+            elif dec == 2020:
+                url = f'https://www2.census.gov/geo/docs/maps-data/data/baf{dec}/{zip_file.name}'
             download(zip_file, url)
-            
-            d = {'VTD':'vtd2020', 'CD':'congress2010', 'SLDU':'senate2010', 'SLDL':'house2010'}
+            d = {'VTD':f'vtd{dec}', 'CD':f'congress{dec-10}', 'SLDU':f'senate{dec-10}', 'SLDL':f'house{dec-10}'}
             L = []
+            geoid = ''
             for abbr, name in d.items():
                 f = zip_file.parent / f'{zip_file.stem}_{abbr}.txt'
                 df = ut.prep(pd.read_csv(f, sep='|'))
@@ -135,23 +155,27 @@ class Redistricter():
 
     @codetiming.Timer()
     def get_shapes(self, overwrite=False):
-        tbl = f'shapes.{self.state.abbr}'
+        dec = get_decade(year)
+        geoid = f'block{dec}'
+        tbl = f'shapes.{self.state.abbr}{dec}'
         attr = tbl.split('.')[0]
         self.tbls[attr] = tbl
         if not self.bq.get_tbl(tbl, overwrite):
             print(f'getting {tbl}')
-            zip_file = self.data_path / f'tl_2020_{self.state.fips}_tabblock20.zip'
-            url = f'https://www2.census.gov/geo/tiger/TIGER2020/TABBLOCK20/{zip_file.name}'
+            d = dec % 100
+            zip_file = self.data_path / f'tl_{dec}_{self.state.fips}_tabblock{d}.zip'
+            if dec == 2010:
+                url = f'https://www2.census.gov/geo/tiger/TIGER{dec}/TABBLOCK/{dec}/{zip_file.name}'
+            elif dec == 2020:
+                url = f'https://www2.census.gov/geo/tiger/TIGER{dec}/TABBLOCK{d}/{zip_file.name}'
+            repl = {'geoid{d}':geoid, 'aland{d}': 'aland', 'awater{d}': 'awater', 'geometry':'geometry',}
             download(zip_file, url, unzip=False)
-            
             repl = {'geoid20':geoid, 'aland20': 'aland', 'awater20': 'awater', 'geometry':'geometry',}
             df = ut.prep(gpd.read_file(zip_file))[repl.keys()].rename(columns=repl).to_crs(crs['bigquery'])
             df.geometry = df.geometry.buffer(0).apply(orient, args=(1,))
             self.bq.df_to_tbl(df, tbl)
         return tbl
-<<<<<<< HEAD
-=======
-    
+
     @codetiming.Timer()
     def get_2020(self, overwrite=False):
         tbl = f'2020.{self.state.abbr}'
@@ -166,7 +190,6 @@ class Redistricter():
                 level = 'block')
             
             df['county'] = df['name'].str.split(', ', expand=True)[3].str[:-7]
->>>>>>> e7e2b139a6ee8c4b0961f8a237c132ca53b6ae33
     
     def combine(self, overwrite=False):
         tbl = f'combine.{self.state.abbr}'
