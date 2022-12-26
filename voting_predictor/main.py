@@ -100,10 +100,31 @@ class Redistricter():
             repl = {'geoid20':geoid, 'aland20': 'aland', 'awater20': 'awater', 'geometry':'geometry',}
             df = ut.prep(gpd.read_file(zip_file))[repl.keys()].rename(columns=repl).to_crs(CRS['bigquery'])
             df.geometry = df.geometry.buffer(0).apply(orient, args=(1,))
-            # self.bq.df_to_tbl(df, tbl)
-        return tbl, df
+            self.bq.df_to_tbl(df, tbl)
+        return tbl
     
-
+    def combine(self, overwrite=False):
+        tbl = f'combine.{self.state.abbr}'
+        attr = tbl.split('.')[0]
+        self.tbls[attr] = tbl
+        if not self.bq.get_tbl(tbl, overwrite):
+            self.get_assignments()
+            self.get_shapes()
+            print(f'getting {tbl}')
+            qry = f"""
+select
+    *
+--    A.*,
+    --B.* (except {geoid}),
+from
+    {self.tbls['assignments']} as A
+inner join
+    {self.tbls['shapes']} as S
+using
+    {geoid}
+"""
+            self.bq.qry_to_tbl(qry, tbl)
+        return tbl
 
 
     # def get_shapes(self, overwrite=False):
