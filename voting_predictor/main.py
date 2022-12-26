@@ -75,6 +75,7 @@ class Redistricter():
         self.state = us.states.lookup(self.state)
         self.tbls = dict()
         
+    @codetiming.Timer()
     def get_crosswalks(self, overwrite=False):
         tbl = f'crosswalks.{self.state.abbr}'
         attr = tbl.split('.')[0]
@@ -95,6 +96,7 @@ class Redistricter():
         self.tbls[tbl.split('.')[0]] = tbl
         return tbl
 
+    @codetiming.Timer()
     def get_assignments(self, overwrite=False):
         tbl = f'assignments.{self.state.abbr}'
         attr = tbl.split('.')[0]
@@ -118,7 +120,7 @@ class Redistricter():
             self.bq.df_to_tbl(df, tbl)
         return tbl
 
-    @Timer()
+    @codetiming.Timer()
     def get_shapes(self, overwrite=False):
         tbl = f'shapes.{self.state.abbr}'
         attr = tbl.split('.')[0]
@@ -134,6 +136,7 @@ class Redistricter():
             self.bq.df_to_tbl(df, tbl)
         return tbl
     
+    @codetiming.Timer()
     def get_2020(self, overwrite=False):
         tbl = f'2020.{self.state.abbr}'
         attr = tbl.split('.')[0]
