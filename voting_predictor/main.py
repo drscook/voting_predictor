@@ -75,16 +75,18 @@ class Redistricter():
         self.tbls = dict()
         
     def get_census(self, fields, dataset='acs5', year=2020, level='tract'):
-        print(f'fetching data from {dataset}', end=elipsis)
         conn = getattr(self.census_session, dataset)
-        fields = ut.prep(fields, mode='upper')
-        
+        fields = ut.prep(ut.listify(fields), mode='upper')
+        if not 'NAME' in fields:
+            fields.insert(0, 'NAME')
         level_alt = level.replace('_', ' ')  # census uses space rather then underscore in block_group here - we must handle and replace
         df = ut.prep(pd.DataFrame(
-            conn(fields=fields, year=year, geo={'for': level_alt+':*', 'in': f'state:{self.state.fips} county:*'})
+            conn.get(fields=fields, year=year, geo={'for': level_alt+':*', 'in': f'state:{self.state.fips} county:*'})
         )).rename(columns={level_alt: level})
+        display(df.head(3))
         df['year'] = year
         df, geoid = get_geoid(df)
+        display(df.head(3))
 
         # if year >= 2020:
         #     geoid = level+'2020'
@@ -96,16 +98,36 @@ class Redistricter():
         #         # df[geoid] += df[level].astype(str).str.rjust(k, '0')
         #         df[geoid] += ut.rjust(df[level], k)
         # assert not df.isnull().any().any(), 'null values detected'
-        print('done!')
-        return ut.prep(df[['year', geoid, *fields]])
-        
+        return ut.prep(df[['year', geoid, *ut.prep(fields)]])
+
+    @codetiming.Timer()
+    def get_pl(self, year=2020, overwrite=False):
+        dec = get_decade(year)
+        geoid = f'block{dec}'
+        tbl = f'pl.{self.state.abbr}{dec}'
+        attr = tbl.split('.')[0]
+        self.tbls[attr] = tbl
+        print(f'{tbl}', end=elipsis)
+        if not self.bq.get_tbl(tbl, overwrite):
+            print('fetching', end=elipsis)
+            df = self.get_census(
+                fields = ['name', *subpops.keys()],
+                dataset = 'pl',
+                year = 2020,
+                level = 'block')
+            df['county'] = df['name'].str.split(', ', expand=True)[3].str[:-7]
+            df = df.rename(columns=subpops)[[geoid, 'county', *subpops.values()]]
+        return tbl, df
+
+
     @codetiming.Timer()
     def get_crosswalks(self, overwrite=False):
         tbl = f'crosswalks.{self.state.abbr}'
         attr = tbl.split('.')[0]
         self.tbls[attr] = tbl
+        print(f'{tbl}', end=elipsis)
         if not self.bq.get_tbl(tbl, overwrite):
-            print(f'getting {tbl}')
+            print('fetching', end=elipsis)
             zip_file = self.data_path / f'{attr}/TAB2010_TAB2020_ST{self.state.fips}.zip'
             url = f'https://www2.census.gov/geo/docs/maps-data/data/rel2020/t10t20/{zip_file.name}'
             download(zip_file, url)
@@ -130,8 +152,9 @@ class Redistricter():
         tbl = f'assignments.{self.state.abbr}{dec}'
         attr = tbl.split('.')[0]
         self.tbls[attr] = tbl
+        print(f'{tbl}', end=elipsis)
         if not self.bq.get_tbl(tbl, overwrite):
-            print(f'getting {tbl}')
+            print('fetching', end=elipsis)
             zip_file = self.data_path / f'{attr}/BlockAssign_ST{self.state.fips}_{self.state.abbr}.zip'
             if dec == 2010:
                 url = f'https://www2.census.gov/geo/docs/maps-data/data/baf/{zip_file.name}'
@@ -147,7 +170,7 @@ class Redistricter():
                     # create vtd id using 3 fips + 6 vtd, pad on left with 0 as needed
                     df['district'] = self.state.fips + ut.rjust(df['countyfp'], 3) + ut.rjust(df['district'], 6)
                 repl = {'blockid': geoid, 'district':name}
-                L.append(df[repl.keys()].rename(columns=repl).set_index(geoid))
+                L.append(df.rename(columns=repl)[repl.values()].set_index(geoid))
             df = pd.concat(L, axis=1)
             self.bq.df_to_tbl(df, tbl)
         return tbl
@@ -159,8 +182,9 @@ class Redistricter():
         tbl = f'shapes.{self.state.abbr}{dec}'
         attr = tbl.split('.')[0]
         self.tbls[attr] = tbl
+        print(f'{tbl}', end=elipsis)
         if not self.bq.get_tbl(tbl, overwrite):
-            print(f'getting {tbl}')
+            print('fetching', end=elipsis)
             d = dec % 100
             zip_file = self.data_path / f'tl_{dec}_{self.state.fips}_tabblock{d}.zip'
             if dec == 2010:
@@ -175,21 +199,10 @@ class Redistricter():
             self.bq.df_to_tbl(df, tbl)
         return tbl
 
+
+
+
     @codetiming.Timer()
-    def get_2020(self, overwrite=False):
-        tbl = f'2020.{self.state.abbr}'
-        attr = tbl.split('.')[0]
-        self.tbls[attr] = tbl
-        if not self.bq.get_tbl(tbl, overwrite):
-            print(f'getting {tbl}')
-            df = get(
-                cols = ['name', *subpops.keys()],
-                dataset = 'pl',
-                year = 2020,
-                level = 'block')
-            
-            df['county'] = df['name'].str.split(', ', expand=True)[3].str[:-7]
-    
     def combine(self, overwrite=False):
         tbl = f'combine.{self.state.abbr}'
         attr = tbl.split('.')[0]
