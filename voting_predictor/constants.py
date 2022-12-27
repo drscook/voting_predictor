@@ -1,4 +1,4 @@
-elipsis = ' ... '
+ellipsis = ' ... '
 levels = {
     'state':2,
     'county':3,
