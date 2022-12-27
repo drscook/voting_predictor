@@ -1,32 +1,11 @@
 from helpers.common_imports import *
 from helpers import utilities as ut
 import census, us, geopandas as gpd
+from .constants import *
 from shapely.ops import orient
 warnings.filterwarnings('ignore', message='.*ShapelyDeprecationWarning.*')
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
-elipsis = ' ... '
-levels = {
-    'state':2,
-    'county':3,
-    'tract':6,
-    'block_group':1,
-    'block':4,
-}
-crs = {
-    'census'  : 'EPSG:4269'  , # degrees - used by Census
-    'bigquery': 'EPSG:4326'  , # WSG84 - used by Bigquery
-    'area'    : 'ESRI:102003', # meters
-    'length'  : 'ESRI:102005', # meters
-}
-subpops = {
-    'p2_001n': 'all_tot_pop',
-    'p4_001n': 'all_vap_pop',
-    'p2_005n': 'white_tot_pop',
-    'p4_005n': 'white_vap_pop',
-    'p2_002n': 'hisp_tot_pop',
-    'p4_002n': 'hisp_vap_pop',
-}
 
 def get_decade(year):
     return int(year) // 10 * 10
@@ -80,6 +59,8 @@ class Redistricter():
         self.bq = ut.BigQuery(project_id=self.bg_project_id)
         self.state = us.states.lookup(self.state)
         self.tbls = dict()
+        self.features = ut.prep(features)
+
         
     def fetch_census(self, fields, dataset='acs5', year=2020, level='tract'):
         conn = getattr(self.census_session, dataset)
@@ -98,6 +79,48 @@ class Redistricter():
         attr = tbl.split('.')[0]
         self.tbls[attr] = tbl
         return self.data_path / attr
+
+
+    def get_acs5(self, year=2018, level='tract', overwrite=False):
+        dec = get_decade(year)
+        geoid = f'{level}{dec}'
+        tbl = f'acs5.{self.state.abbr}{dec}'
+        path = self.get_path(tbl)
+        if not self.bq.get_tbl(tbl, overwrite):
+            # print(f'{tbl} fetching', end=elipsis)
+
+            tbl_raw = tbl+'_raw'
+            if not self.bq.get_tbl(tbl_raw, overwrite):
+                print(f'{tbl_raw} fetching', end=elipsis)
+
+                base = set().union(self.features.values())
+                survey = {x for x in base if x[0]=='s'}
+                base = base.difference(survey)
+                B = self.fetch_census(fields=base , dataset='acs5'  , year=year, level=level)
+                S = self.fetch_census(fields=suvey, dataset='acs5st', year=year, level=level)
+                df = B.merge(S, on=['year', geoid])
+                for name, fields in self.features.items():
+                    df[name] = df[fields].sum(axis=1)
+                df = ut.prep(df[[geoid, 'year', *self.features.keys()]])
+                for var in {name.split('_')[-1] for name in self.features.keys()}:
+                    compute_other(df, var)
+                self.bq.df_to_tbl(df, tbl_raw)
+                # for var in FEATURES['age_var'].unique():
+                #     compute_other(df, var)
+
+
+                # base = set().union(*features['cols'])
+                # survey = {x for x in base if x[0].lower()=='s'}
+                # base = base.difference(survey)
+                # df = get(base, 'acs5', year, level).merge(get(survey, 'acs5st', year, level), on=['year', geoid])
+                # for k, row in FEATURES.iterrows():
+                #     df[row['name']] = df[row['cols']].sum(axis=1)
+
+                # df = df[[geoid, 'year', *FEATURES['name']]].copy()
+                for var in FEATURES['age_var'].unique():
+                    compute_other(df, var)
+                df_to_table(df, tbl_raw)
+                df_to_parquet(df, pq_(tbl_raw))
 
 
     @codetiming.Timer()
