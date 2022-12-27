@@ -52,10 +52,11 @@ def get_geoid(df, year=2020):
     geoid = 'block'+dec
     df[geoid] = ''
     for level, k in levels.items():
-        for col in [level, level+dec, level+'_'+dec]:
-            if col in df:
+        for col in [level, level+'_'+dec]:
+            if col in df.columns:
                 df[geoid] += ut.rjust(df[col], k)
                 break
+    df[geoid] = ut.prep(df[geoid])#.astype(np.int64)
     return geoid
 
 def compute_other(df, feat):
@@ -98,28 +99,79 @@ class Redistricter():
         self.tbls[attr] = tbl
         return self.data_path / attr
 
+
     @codetiming.Timer()
-    def combine(self, year=2020, overwrite=False):
-        dec = get_decade(year)
-        geoid = f'block{dec}'
-        tbl = f'combine.{self.state.abbr}{dec}'
+    def get_crosswalks(self, overwrite=False):
+        tbl = f'crosswalks.{self.state.abbr}'
+        geoid = f'block2020'
         path = self.get_path(tbl)
         if not self.bq.get_tbl(tbl, overwrite):
+            tbl_raw = tbl+'_raw'
+            if not self.bq.get_tbl(tbl_raw, overwrite):
+                print(f'{tbl_raw} fetching', end=elipsis)
+                zip_file = path / f'TAB2010_TAB2020_ST{self.state.fips}.zip'
+                url = f'https://www2.census.gov/geo/docs/maps-data/data/rel2020/t10t20/{zip_file.name}'
+                download(zip_file, url)
+            
+                txt = zip_file.with_name(f'{zip_file.stem}_{self.state.abbr}.txt'.lower())
+                df = ut.prep(pd.read_csv(txt, sep='|')).rename(columns={'arealand_int': 'aland', 'blk_2010': 'block_2010', 'blk_2020': 'block_2020'})
+                for dec in [2010, 2020]:
+                    geoid = get_geoid(df, dec)
+                    df[f'aprop{dec}'] = df['aland'] / np.fmax(df.groupby(geoid)['aland'].transform('sum'), 1)
+                df = ut.prep(df[['block2010', 'block2020', 'aland', 'prop2010', 'prop2020']])
+                self.bq.df_to_tbl(df, tbl_raw)
+            self.get_geo(year=2020)
+            print(f'{tbl} building', end=elipsis)
+            qry = f"""
+select
+    A.*,
+    {ut.make_select([f'sum(aprop2020 * {subpop}) as {subpop}' for subpop in [*subpops.values(), 'other_tot_pop', 'other_vap_pop']])}
+from
+    {tbl_raw} as A
+inner join
+    {self.tbls['geo']} as G
+using
+    ({geoid})
+group by
+    {geoid}
+"""
+            print(qry)
+            self.bq.qry_to_tbl(qry, tbl)
+        print(tbl, end=elipsis)
+        return tbl
+
+
+    @codetiming.Timer()
+    def get_geo(self, year=2020, overwrite=False):
+        dec = get_decade(year)
+        geoid = f'block{dec}'
+        tbl = f'geo.{self.state.abbr}{dec}'
+        path = self.get_path(tbl)
+        if not self.bq.get_tbl(tbl, overwrite):
+            self.get_pl(year)
             self.get_assignments(year)
             self.get_shapes(year)
-            self.get_pl(year)
             print(f'{tbl} fetching', end=elipsis)
             qry = f"""
 select
-    *
+    * except (geometry),
+    case when perim < 0.1 then 0 else 4 * {np.pi} * atot / (perim * perim) end as polsby_popper,
+    geometry,
 from
-    {self.tbls['assignments']} as A
-inner join
     {self.tbls['pl']} as P
+inner join
+    {self.tbls['assignments']} as A
 using
     ({geoid})
-inner join
-    {self.tbls['shapes']} as S
+inner join (
+    select
+        *,
+        st_distance(geometry, (select st_boundary(us_outline_geom) from bigquery-public-data.geo_us_boundaries.national_outline)) as dist_to_border,
+        st_area(geometry) as atot,
+        st_perimeter(geometry) as perim,
+    from
+        {self.tbls['shapes']}
+    ) as S
 using
     ({geoid})
 """
@@ -144,7 +196,6 @@ using
             self.bq.df_to_tbl(df, tbl)
         print(tbl, end=elipsis)
         return tbl
-
 
 
     @codetiming.Timer()
@@ -177,6 +228,7 @@ using
         print(tbl, end=elipsis)
         return tbl
 
+
     @codetiming.Timer()
     def get_shapes(self, year=2020, overwrite=False):
         dec = get_decade(year)
@@ -199,34 +251,3 @@ using
             self.bq.df_to_tbl(df, tbl)
         print(tbl, end=elipsis)
         return tbl
-
-
-    @codetiming.Timer()
-    def get_crosswalks(self, overwrite=False):
-        tbl = f'crosswalks.{self.state.abbr}'
-        path = self.get_path(tbl)
-        if not self.bq.get_tbl(tbl, overwrite):
-            print(f'{tbl} fetching', end=elipsis)
-            zip_file = path / f'TAB2010_TAB2020_ST{self.state.fips}.zip'
-            url = f'https://www2.census.gov/geo/docs/maps-data/data/rel2020/t10t20/{zip_file.name}'
-            download(zip_file, url)
-            
-            txt = zip_file.with_name(f'{zip_file.stem}_{self.state.abbr}.txt'.lower())
-            df = ut.prep(pd.read_csv(txt, sep='|')).rename(columns={'arealand_int': 'aland', 'blk_2010': 'block_2010', 'blk_2020': 'block_2020'})
-            for dec in [2010, 2020]:
-                geoid = get_geoid(df, dec)
-                df[f'prop{dec}'] = df['aland'] / np.fmax(df.groupby(geoid)['aland'].transform('sum'), 1)
-            df = ut.prep(df[['block2010', 'block2020', 'aland', 'prop2010', 'prop2020']])
-            self.bq.df_to_tbl(df, tbl)
-        self.tbls[tbl.split('.')[0]] = tbl
-        print(tbl, end=elipsis)
-        return tbl
-
-
-
-
-    # def get_shapes(self, overwrite=False):
-    #     attr = 'shapes'
-    #     tbl = f'{attr}.{self.state.abbr}'
-    #     self.tbls[attr] = tbl
-    #     if not self.bq.get_tbl(tbl, overwrite):
