@@ -77,16 +77,69 @@ class Redistricter():
         attr = tbl.split('.')[0]
         self.tbls[attr] = tbl
         path = self.data_path / attr
-
         g = tbl.split('_')[-1]
         level, year = g[:-4], int(g[-4:])
         decade = get_decade(year)
         geoid = f'{level}{decade}'
-        
         return path, geoid, level, year, decade
-        
 
-    @codetiming.Timer()
+
+    def get_elections(self, overwrite=False):
+        if self.state.abbr != 'TX':
+            return False
+        tbl = f'elections.{self.state.abbr}_vtd2022'
+        path, geoid, level, year, decade = self.parse(tbl)
+        if not self.bq.get_tbl(tbl, overwrite):
+            tbl_raw = tbl + '_raw'
+            if not self.bq.get_tbl(tbl_raw, overwrite):
+                print(f'getting {tbl_raw}')
+                zip_file = path / f'2020-general-vtd-election-data-2020.zip'
+                url = f'https://data.capitol.texas.gov/dataset/35b16aee-0bb0-4866-b1ec-859f1f044241/resource/5af9f5e2-ca14-4e5d-880e-3c3cd891d3ed/download/{zip_file.name}'
+                download(zip_file, url)
+
+                L = []
+                cols = ['year', 'county', 'fips', 'vtd', 'election', 'office', 'name', 'party', 'incumbent', 'votes']
+                for file in path.iterdir():
+                    a = ut.prep(file.stem.split('_'))
+                    if a[-1] == 'returns':
+                        df = ut.prep(pd.read_csv(file))
+                        mask = (df['votes'] > 0) & (df['party'].isin(('R', 'D', 'L', 'G')))
+                        if mask.any():
+                            df['year'] = int(a[0])
+                            df['election'] = ut.join(a[1:-2], '_')
+                            df['incumbent'] = df['incumbent'] == 'Y'
+                            L.append(df.loc[mask, cols])
+                df = ut.prep(pd.concat(L, axis=0)).reset_index(drop=True)
+                # df['vtd'] = df['vtd'].astype('string')
+                df['vtd'] = ut.rjust(df['vtd'], 6)
+                df['fips'] = self.state.fips + ut.rjust(df['fips'], 3)
+                self.bq.df_to_tbl(df, tbl_raw)
+            qry = f"""
+select
+    A.year,
+    --coalesce(B.vtd2020, C.vtd2020, A.fips || A.vtd) as vtd2020,
+    coalesce(B.vtd2020, C.vtd2020) as vtd2020,
+    A.fips,
+    A.county,
+    A.election,
+    replace(replace(replace(A.office, ' ', ''), '.', ''), ',', '') as office,
+    replace(A.name, ' ', '') as name,
+    upper(A.party) as party,
+    A.incumbent,
+    A.year || '_' || A.election || '_' || A.office || '_' || A.name || '_' | |A.party as campaign,
+    sum(A.votes) as votes,
+    sum(coalesce(B.all_tot_pop, C.all_tot_pop)) as all_tot_pop,
+from {tbl_raw} as A
+left join {self.get_geo()} as B
+on A.fips || A.vtd = B.vtd2020
+left join {self.get_geo()} as C
+on A.fips || '0' || left(A.vtd, 5) = C.vtd2020
+group by 1,2,3,4,5,6,7,8,9,10"""
+            # print(qry)
+            self.bq.qry_to_tbl(qry, tbl)
+        return tbl
+
+
     def transform_acs5(self, level='tract', year=2018, targ='vtd2020', overwrite=False):
         tbl_raw = self.get_acs5(level=level, year=year)
         path, geoid, level, year, decade = self.parse(tbl_raw)
@@ -105,25 +158,17 @@ from (
         T.{targ},
         T.county2020,
         {ut.make_select([f'sum(A.{x} * T.{x[:x.rfind("_")]}_pop) as {x}' for x in features.keys()], 2)},
-    from
-        {tbl_raw} as A
-    inner join
-        {self.get_transformer(level=level, year=year)} as T
-    using
-        ({geoid})
-    group by
-        1, 2, 3
+    from {tbl_raw} as A
+    inner join {self.get_transformer(level=level, year=year)} as T
+    using ({geoid})
+    group by 1, 2, 3
     ) as B
-qualify
-    r = 1
-"""
-            print(qry)
+qualify r = 1"""
+            # print(qry)
             self.bq.qry_to_tbl(qry, tbl)
-        print(tbl, end=ellipsis)
         return tbl
 
 
-    @codetiming.Timer()
     def get_acs5(self, level='tract', year=2018, overwrite=False):
         tbl = f'acs5.{self.state.abbr}_{level}{year}'
         path, geoid, level, year, decade = self.parse(tbl)
@@ -140,10 +185,9 @@ qualify
             for var in {name[name.find('_')+1:] for name in features.keys()}:
                 compute_other(df, var)
             self.bq.df_to_tbl(df, tbl)
-        print(tbl, end=ellipsis)
         return tbl
 
-    @codetiming.Timer()
+
     def get_transformer(self, level='tract', year=2018, overwrite=False):
         tbl = f'transformers.{self.state.abbr}_{level}{year}'
         path, geoid, level, year, decade = self.parse(tbl)
@@ -157,27 +201,18 @@ select
     A.vtd2020,
     A.county2020,
     {ut.make_select([f'case when B.{x} = 0 then 0 else A.{x} / B.{x} end as {x}' for x in subpops.keys()])},
-from
-    {self.get_crosswalks()} as A
+from {self.get_crosswalks()} as A
 inner join (
-    select
-        {geoid},
-        {ut.make_select([f'sum({x}) as {x}' for x in subpops.keys()], 2)},
-    from
-        {self.get_crosswalks()}
-    group by
-        {geoid}
+    select {geoid}, {ut.make_select([f'sum({x}) as {x}' for x in subpops.keys()], 2)},
+    from {self.get_crosswalks()}
+    group by {geoid}
     ) as B
-using
-    ({geoid})
-"""
+using ({geoid})"""
             # print(qry)
             self.bq.qry_to_tbl(qry, tbl)
-        print(tbl, end=ellipsis)
         return tbl
 
 
-    @codetiming.Timer()
     def get_crosswalks(self, overwrite=False):
         tbl = f'crosswalks.{self.state.abbr}_block2020'
         path, geoid, level, year, decade = self.parse(tbl)
@@ -206,52 +241,83 @@ select
     G.vtd2020,
     G.county2020,
     {ut.make_select([f'C.aprop2020 * G.{subpop} as {subpop}' for subpop in subpops.keys()])}
-from
-    {tbl_raw} as C
-left join
-    {self.get_geo()} as G
-using
-    (block2020)
-left join
-    {self.get_assignments(year=2010)} as A
-using
-    (block2010)
-"""
+from {tbl_raw} as C
+left join {self.get_geo()} as G
+using (block2020)
+left join {self.get_assignments(year=2010)} as A
+using (block2010)"""
             # print(qry)
             self.bq.qry_to_tbl(qry, tbl)
-        print(tbl, end=ellipsis)
         return tbl
 
 
-    @codetiming.Timer()
-    def get_geo(self, overwrite=False):
-        tbl = f'geo.{self.state.abbr}_block2020'
+    def get_geo(self, level='block', overwrite=False):
+        tbl = f'geo.{self.state.abbr}_{level}2020'
         path, geoid, level, year, decade = self.parse(tbl)
         if not self.bq.get_tbl(tbl, overwrite):
-            qry = f"""
-select
-    * except (geometry),
-    case when S.perim < 0.1 then 0 else 4 * {np.pi} * S.atot / (S.perim * S.perim) end as polsby_popper,
-    S.geometry,
-from
-    {self.get_pl()} as P
-left join
-    {self.get_assignments()} as A
-using
-    ({geoid})
-left join (
-    select
-        *,
-        st_distance(geometry, (select st_boundary(us_outline_geom) from bigquery-public-data.geo_us_boundaries.national_outline)) as dist_to_border,
-        st_area(geometry) as atot,
-        st_perimeter(geometry) as perim,
-    from
-        {self.get_shapes()}
+            if level == 'block':
+                qry = f"""
+select * except (geometry), geometry,
+from (
+    select *, case when perim < 0.1 then 0 else 4 * {np.pi} * atot / (perim * perim) end as polsby_popper,
+    from (
+        select
+            {geoid},
+            st_distance(geometry, (select st_boundary(us_outline_geom) from bigquery-public-data.geo_us_boundaries.national_outline)) as dist_to_border,
+            aland,
+            awater,
+            st_area(geometry) as atot,
+            st_perimeter(geometry) as perim,
+            geometry,
+        from {self.get_shapes()} )
     ) as S
-using
-    ({geoid})
-"""
+join {self.get_pl()} as P
+using ({geoid})
+join {self.get_assignments()} as A
+using ({geoid})"""
+                if self.state.abbr == 'TX':
+                    qry += f"""
+join {self.get_plans()} as B
+using ({geoid})"""
 
+
+            else:
+                tbl_raw = self.get_geo(level='block')
+                geo_cols = [geoid, 'dist_to_border', 'aland', 'awater', 'atot', 'perim', 'polsby_popper', 'geometry']
+                pop_cols = ['all_tot_pop', 'all_vap_pop', 'white_tot_pop', 'white_vap_pop', 'hisp_tot_pop', 'hisp_vap_pop', 'other_tot_pop', 'other_vap_pop']
+                exclude_cols = ['block2020']
+                district_cols = [x for x in self.bq.get_cols(tbl_raw) if x not in geo_cols + pop_cols + exclude_cols]
+                qry = f"""
+select * except (geometry), geometry,
+from (
+    select *, case when perim < 0.1 then 0 else 4 * {np.pi} * atot / (perim * perim) end as polsby_popper,
+    from (
+        select *, st_perimeter(geometry) as perim,        
+        from (
+            select
+                {geoid},
+                min(dist_to_border) as dist_to_border,
+                sum(aland) as aland,
+                sum(awater) as awater,
+                sum(atot) as atot,
+                st_union_agg(geometry) as geometry,
+            from {tbl_raw}
+            group by {geoid}
+            )
+        )
+    ) as S
+join (
+    select {geoid}, {ut.join([f"sum({col}) as {col}" for col in pop_cols])},
+    from {tbl_raw}
+    group by {geoid}
+) as P
+using ({geoid})
+join (
+    select {geoid}, {ut.join(district_cols)}
+    from {tbl_raw}
+    qualify row_number() over (partition by {geoid} order by all_tot_pop desc) = 1
+) as D
+using ({geoid})"""
             # print(qry)
             self.bq.qry_to_tbl(qry, tbl)
         print(tbl, end=ellipsis)
@@ -333,11 +399,11 @@ using
         path, geoid, level, year, decade = self.parse(tbl)
         if not self.bq.get_tbl(tbl, overwrite):
             repl = {v:k for k,v in subpops.items() if v}
-            df = self.fetch_census(fields=['name', *repl.keys()], dataset='pl', year=year, level='block')
-            df['county2020'] = df['name'].str.split(', ', expand=True)[3].str[:-7]
-            df = df.rename(columns=repl)[[geoid, *repl.values(), 'county2020']]
+            df = self.fetch_census(fields=['name', *repl.keys()], dataset='pl', year=year, level='block').rename(columns=repl)
             compute_other(df, 'tot_pop')
             compute_other(df, 'vap_pop')
+            df['county2020'] = df['name'].str.split(', ', expand=True)[3].str[:-7]
+            df = df[[geoid, *subpops.keys(), 'county2020']]
             self.bq.df_to_tbl(df, tbl)
         print(tbl, end=ellipsis)
         return tbl
