@@ -20,8 +20,8 @@ def download(file, url, unzip=True, overwrite=False):
         ut.mkdir(file.parent)
         os.system(f'wget -O {file} {url}')
         print('done!')
-    if unzip:
-        ut.unzipper(file)
+        if unzip:
+            ut.unzipper(file)
     return file
 
 def get_geoid(df, year=2020, level='block'):
@@ -251,6 +251,7 @@ left join (
 using
     ({geoid})
 """
+
             # print(qry)
             self.bq.qry_to_tbl(qry, tbl)
         print(tbl, end=ellipsis)
@@ -261,16 +262,16 @@ using
     def get_plans(self, overwrite=False):
         if self.state.abbr != 'TX':
             return False
-        tbl = f'plans.{self.state.abbr}_block{year}'
+        tbl = f'plans.{self.state.abbr}_block2020'
         path, geoid, level, year, decade = self.parse(tbl)
         if not self.bq.get_tbl(tbl, overwrite):
-            browser = mechanicalsoup.Browser()
             district_types = {'s':31, 'h':150, 'c':38}
+            browser = mechanicalsoup.Browser()
             for dt in district_types.keys():
                 not_found = 0
                 for k in range(1000):
                     not_found += 1
-                    proposal = f'plan{dt}{2100+k}'.lower()
+                    proposal = f'plan{dt}{2100+k}'
                     root_url = f'https://data.capitol.texas.gov/dataset/{proposal}#'
                     login_page = browser.get(root_url)
                     tag = login_page.soup.select('a')
@@ -284,25 +285,18 @@ using
                     if not_found > 15:
                         break
             for file in path.iterdir():
-                if file.suffix == '.zip':
-                    unzipper(file)
+                ut.unzipper(file)
             L = []
             for file in path.iterdir():
                 if file.suffix == '.csv':
-                    plan = file.stem.lower()
-                    dt = plan[4]
-                    df = prep(pd.read_csv(file))
-                    df.columns = ['block2020', 'district']
-                    # df['year'] = 2020
-                    df['plan'] = plan
-
-                    if df['district'].nunique() == district_types[dt]:
-                        tbl_raw = f'plans.{plan}'
-                        df_to_table(df, tbl_raw)
-                        L.append(tbl_raw)
-
-
-
+                    plan = ut.prep(file.stem)
+                    df = ut.prep(pd.read_csv(file, names=[geoid, plan], header=0)).set_index(geoid)
+                    if df[plan].nunique() == district_types[plan[4]]:
+                        L.append(df)
+            df = ut.prep(pd.concat(L, axis=1))
+            self.bq.df_to_tbl(df, tbl)
+        print(tbl, end=ellipsis)
+        return tbl
 
 
     @codetiming.Timer()
