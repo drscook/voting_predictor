@@ -69,19 +69,17 @@ class Redistricter():
             fields.insert(0, 'NAME')
         level_alt = level.replace('_', ' ')  # census uses space rather then underscore in block_group here - we must handle and replace
         
-        opts = {'fields':fields, 'year':year, 'geo':{'for': level_alt+':*', 'in': f'state:{self.state.fips} county:*'}}
-        print(opts)
+        # opts = {'fields':fields, 'year':year, 'geo':{'for': level_alt+':*', 'in': f'state:{self.state.fips} county:*'}}
+        # print(opts)
 
-        df = ut.prep(pd.DataFrame(conn.get(**opts))).rename(columns={level_alt: level})
+        # df = ut.prep(pd.DataFrame(conn.get(**opts))).rename(columns={level_alt: level})
 
 
-        # df = ut.prep(pd.DataFrame(
-        #     conn.get(fields=fields, year=year, geo={'for': level_alt+':*', 'in': f'state:{self.state.fips} county:*'})
-        # )).rename(columns={level_alt: level})
-        print(df.columns)
-        display(df.head(3))
+        df = ut.prep(pd.DataFrame(
+            conn.get(fields=fields, year=year, geo={'for': level_alt+':*', 'in': f'state:{self.state.fips} county:*'})
+        )).rename(columns={level_alt: level}).copy()
         df['year'] = year
-        geoid = get_geoid(df)
+        geoid = get_geoid(df, year=year, level=level)
         return ut.prep(df[['year', geoid, *ut.prep(fields)]])
 
     def get_path(self, tbl):
@@ -93,7 +91,7 @@ class Redistricter():
     def get_acs5(self, year=2018, level='tract', overwrite=False):
         dec = get_decade(year)
         geoid = f'{level}{dec}'
-        tbl = f'acs5.{self.state.abbr}{dec}'
+        tbl = f'acs5.{self.state.abbr}{year}'
         path = self.get_path(tbl)
         if not self.bq.get_tbl(tbl, overwrite):
             # print(f'{tbl} fetching', end=elipsis)
@@ -113,25 +111,12 @@ class Redistricter():
                 for name, fields in self.features.items():
                     df[name] = df[fields].sum(axis=1)
                 df = ut.prep(df[[geoid, 'year', *self.features.keys()]])
-                for var in {name.split('_')[-1] for name in self.features.keys()}:
+                for var in {name[name.find('_')+1:] for name in self.features.keys()}:
                     compute_other(df, var)
                 self.bq.df_to_tbl(df, tbl_raw)
-                # for var in FEATURES['age_var'].unique():
-                #     compute_other(df, var)
-
-
-                # base = set().union(*features['cols'])
-                # survey = {x for x in base if x[0].lower()=='s'}
-                # base = base.difference(survey)
-                # df = get(base, 'acs5', year, level).merge(get(survey, 'acs5st', year, level), on=['year', geoid])
-                # for k, row in FEATURES.iterrows():
-                #     df[row['name']] = df[row['cols']].sum(axis=1)
-
-                # df = df[[geoid, 'year', *FEATURES['name']]].copy()
-                for var in FEATURES['age_var'].unique():
-                    compute_other(df, var)
-                df_to_table(df, tbl_raw)
-                df_to_parquet(df, pq_(tbl_raw))
+        #     self.bq.qry_to_tbl(qry, tbl)
+        # print(tbl, end=elipsis)
+        return tbl
 
 
     @codetiming.Timer()
