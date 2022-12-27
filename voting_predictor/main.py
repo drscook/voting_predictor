@@ -11,9 +11,6 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 def get_decade(year):
     return int(year) // 10 * 10
 
-def unzipper(file):
-    os.system(f'unzip -u -qq -n {file} -d {file.parent}')
-
 def download(file, url, unzip=True, overwrite=False):
     """Help download data from internet sources"""
     if overwrite:
@@ -23,8 +20,8 @@ def download(file, url, unzip=True, overwrite=False):
         ut.mkdir(file.parent)
         os.system(f'wget -O {file} {url}')
         print('done!')
-    if file.suffix == '.zip' and unzip:
-        unzipper(file)
+    if unzip:
+        ut.unzipper(file)
     return file
 
 def get_geoid(df, year=2020, level='block'):
@@ -282,13 +279,27 @@ using
                         for t in tag:
                             url = t['href']
                             if 'blk.zip' in url:
-                                zip_file = pq.parent / url.split('/')[-1]
+                                zip_file = path / url.split('/')[-1]
                                 download(zip_file, url)
                     if not_found > 15:
                         break
-            for file in pq.parent.iterdir():
+            for file in path.iterdir():
                 if file.suffix == '.zip':
                     unzipper(file)
+            L = []
+            for file in path.iterdir():
+                if file.suffix == '.csv':
+                    plan = file.stem.lower()
+                    dt = plan[4]
+                    df = prep(pd.read_csv(file))
+                    df.columns = ['block2020', 'district']
+                    # df['year'] = 2020
+                    df['plan'] = plan
+
+                    if df['district'].nunique() == district_types[dt]:
+                        tbl_raw = f'plans.{plan}'
+                        df_to_table(df, tbl_raw)
+                        L.append(tbl_raw)
 
 
 
