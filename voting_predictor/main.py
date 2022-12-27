@@ -4,8 +4,9 @@ import census, us, geopandas as gpd
 from .constants import *
 from shapely.ops import orient
 warnings.filterwarnings('ignore', message='.*ShapelyDeprecationWarning.*')
+warnings.filterwarnings('ignore', message='.*DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.*')
 warnings.simplefilter(action='ignore', category=FutureWarning)
-
+ 
 
 def get_decade(year):
     return int(year) // 10 * 10
@@ -68,16 +69,9 @@ class Redistricter():
         if not 'NAME' in fields:
             fields.insert(0, 'NAME')
         level_alt = level.replace('_', ' ')  # census uses space rather then underscore in block_group here - we must handle and replace
-        
-        # opts = {'fields':fields, 'year':year, 'geo':{'for': level_alt+':*', 'in': f'state:{self.state.fips} county:*'}}
-        # print(opts)
-
-        # df = ut.prep(pd.DataFrame(conn.get(**opts))).rename(columns={level_alt: level})
-
-
         df = ut.prep(pd.DataFrame(
             conn.get(fields=fields, year=year, geo={'for': level_alt+':*', 'in': f'state:{self.state.fips} county:*'})
-        )).rename(columns={level_alt: level}).copy()
+        )).rename(columns={level_alt: level})
         df['year'] = year
         geoid = get_geoid(df, year=year, level=level)
         return ut.prep(df[['year', geoid, *ut.prep(fields)]])
@@ -94,19 +88,16 @@ class Redistricter():
         tbl = f'acs5.{self.state.abbr}{year}'
         path = self.get_path(tbl)
         if not self.bq.get_tbl(tbl, overwrite):
-            # print(f'{tbl} fetching', end=elipsis)
-
             tbl_raw = tbl+'_raw'
             if not self.bq.get_tbl(tbl_raw, overwrite):
                 print(f'{tbl_raw} fetching', end=elipsis)
-
                 base = set().union(*self.features.values())
                 survey = {x for x in base if x[0]=='s'}
                 base = base.difference(survey)
                 B = self.fetch_census(fields=base  , dataset='acs5'  , year=year, level=level)
                 S = self.fetch_census(fields=survey, dataset='acs5st', year=year, level=level)
-                self.B = B
-                self.S = S
+                # self.B = B
+                # self.S = S
                 df = B.merge(S, on=['year', geoid])
                 for name, fields in self.features.items():
                     df[name] = df[fields].sum(axis=1)
