@@ -26,16 +26,16 @@ def download(file, url, unzip=True, overwrite=False):
         unzipper(file)
     return file
 
-def get_geoid(df, year=2020):
+def get_geoid(df, year=2020, level='block'):
     dec = str(get_decade(year))
-    geoid = 'block'+dec
+    geoid = level+dec
     df[geoid] = ''
     for level, k in levels.items():
         for col in [level, level+'_'+dec]:
             if col in df.columns:
                 df[geoid] += ut.rjust(df[col], k)
                 break
-    df[geoid] = ut.prep(df[geoid])#.astype(np.int64)
+    # df[geoid] = ut.prep(df[geoid])
     return geoid
 
 def compute_other(df, feat):
@@ -68,9 +68,18 @@ class Redistricter():
         if not 'NAME' in fields:
             fields.insert(0, 'NAME')
         level_alt = level.replace('_', ' ')  # census uses space rather then underscore in block_group here - we must handle and replace
-        df = ut.prep(pd.DataFrame(
-            conn.get(fields=fields, year=year, geo={'for': level_alt+':*', 'in': f'state:{self.state.fips} county:*'})
-        )).rename(columns={level_alt: level})
+        
+        opts = {'fields':fields, 'year':year, 'geo':{'for': level_alt+':*', 'in': f'state:{self.state.fips} county:*'}}
+        print(opts)
+
+        df = ut.prep(pd.DataFrame(conn.get(**opts))).rename(columns={level_alt: level})
+
+
+        # df = ut.prep(pd.DataFrame(
+        #     conn.get(fields=fields, year=year, geo={'for': level_alt+':*', 'in': f'state:{self.state.fips} county:*'})
+        # )).rename(columns={level_alt: level})
+        print(df.columns)
+        display(df.head(3))
         df['year'] = year
         geoid = get_geoid(df)
         return ut.prep(df[['year', geoid, *ut.prep(fields)]])
@@ -93,11 +102,13 @@ class Redistricter():
             if not self.bq.get_tbl(tbl_raw, overwrite):
                 print(f'{tbl_raw} fetching', end=elipsis)
 
-                base = set().union(self.features.values())
+                base = set().union(*self.features.values())
                 survey = {x for x in base if x[0]=='s'}
                 base = base.difference(survey)
-                B = self.fetch_census(fields=base , dataset='acs5'  , year=year, level=level)
-                S = self.fetch_census(fields=suvey, dataset='acs5st', year=year, level=level)
+                B = self.fetch_census(fields=base  , dataset='acs5'  , year=year, level=level)
+                S = self.fetch_census(fields=survey, dataset='acs5st', year=year, level=level)
+                self.B = B
+                self.S = S
                 df = B.merge(S, on=['year', geoid])
                 for name, fields in self.features.items():
                     df[name] = df[fields].sum(axis=1)
@@ -141,39 +152,36 @@ class Redistricter():
                 for dec in [2010, 2020]:
                     geoid = get_geoid(df, dec)
                     df[f'aprop{dec}'] = df['aland'] / np.fmax(df.groupby(geoid)['aland'].transform('sum'), 1)
-                df = ut.prep(df[['block2010', 'block2020', 'aland', 'prop2010', 'prop2020']])
+                df = ut.prep(df[['block2010', 'block2020', 'aland', 'aprop2010', 'aprop2020']])
                 self.bq.df_to_tbl(df, tbl_raw)
-            self.get_geo(year=2020)
+            self.get_geo()
             print(f'{tbl} building', end=elipsis)
             qry = f"""
 select
     A.*,
-    {ut.make_select([f'sum(aprop2020 * {subpop}) as {subpop}' for subpop in [*subpops.values(), 'other_tot_pop', 'other_vap_pop']])}
+    {ut.make_select([f'aprop2020 * {subpop} as {subpop}' for subpop in [*subpops.values(), 'other_tot_pop', 'other_vap_pop']])}
 from
     {tbl_raw} as A
 inner join
     {self.tbls['geo']} as G
 using
     ({geoid})
-group by
-    {geoid}
 """
-            print(qry)
             self.bq.qry_to_tbl(qry, tbl)
         print(tbl, end=elipsis)
         return tbl
 
 
     @codetiming.Timer()
-    def get_geo(self, year=2020, overwrite=False):
-        dec = get_decade(year)
+    def get_geo(self, overwrite=False):
+        dec = 2020
         geoid = f'block{dec}'
         tbl = f'geo.{self.state.abbr}{dec}'
         path = self.get_path(tbl)
         if not self.bq.get_tbl(tbl, overwrite):
-            self.get_pl(year)
-            self.get_assignments(year)
-            self.get_shapes(year)
+            self.get_pl()
+            self.get_assignments()
+            self.get_shapes()
             print(f'{tbl} fetching', end=elipsis)
             qry = f"""
 select
@@ -198,32 +206,37 @@ inner join (
 using
     ({geoid})
 """
-            print(qry)
             self.bq.qry_to_tbl(qry, tbl)
         return tbl
 
 
     @codetiming.Timer()
-    def get_pl(self, year=2020, overwrite=False):
-        dec = get_decade(year)
+    def get_shapes(self, overwrite=False):
+        dec = 2020
         geoid = f'block{dec}'
-        tbl = f'pl.{self.state.abbr}{dec}'
+        tbl = f'shapes.{self.state.abbr}{dec}'
         path = self.get_path(tbl)
         if not self.bq.get_tbl(tbl, overwrite):
             print(f'{tbl} fetching', end=elipsis)
-            df = self.fetch_census(fields=['name', *subpops.keys()], dataset='pl', year=dec, level='block')
-            df['county'] = df['name'].str.split(', ', expand=True)[3].str[:-7]
-            df = df.rename(columns=subpops)[[geoid, 'county', *subpops.values()]]
-            compute_other(df, 'tot_pop')
-            compute_other(df, 'vap_pop')
+            d = dec % 100
+            zip_file = path / f'tl_{dec}_{self.state.fips}_tabblock{d}.zip'
+            if dec == 2010:
+                url = f'https://www2.census.gov/geo/tiger/TIGER{dec}/TABBLOCK/{dec}/{zip_file.name}'
+            elif dec == 2020:
+                url = f'https://www2.census.gov/geo/tiger/TIGER{dec}/TABBLOCK{d}/{zip_file.name}'
+            download(zip_file, url, unzip=False)
+
+            repl = {'geoid{d}':geoid, 'aland{d}': 'aland', 'awater{d}': 'awater', 'geometry':'geometry',}
+            df = ut.prep(gpd.read_file(zip_file)).rename(columns=repl)[repl.values()].to_crs(crs['bigquery'])
+            df.geometry = df.geometry.buffer(0).apply(orient, args=(1,))
             self.bq.df_to_tbl(df, tbl)
         print(tbl, end=elipsis)
         return tbl
 
 
     @codetiming.Timer()
-    def get_assignments(self, year=2020, overwrite=False):
-        dec = get_decade(year)
+    def get_assignments(self, overwrite=False):
+        dec = 2020
         geoid = f'block{dec}'
         tbl = f'assignments.{self.state.abbr}{dec}'
         path = self.get_path(tbl)
@@ -253,24 +266,18 @@ using
 
 
     @codetiming.Timer()
-    def get_shapes(self, year=2020, overwrite=False):
-        dec = get_decade(year)
+    def get_pl(self, overwrite=False):
+        dec = 2020
         geoid = f'block{dec}'
-        tbl = f'shapes.{self.state.abbr}{dec}'
+        tbl = f'pl.{self.state.abbr}{dec}'
         path = self.get_path(tbl)
         if not self.bq.get_tbl(tbl, overwrite):
             print(f'{tbl} fetching', end=elipsis)
-            d = dec % 100
-            zip_file = path / f'tl_{dec}_{self.state.fips}_tabblock{d}.zip'
-            if dec == 2010:
-                url = f'https://www2.census.gov/geo/tiger/TIGER{dec}/TABBLOCK/{dec}/{zip_file.name}'
-            elif dec == 2020:
-                url = f'https://www2.census.gov/geo/tiger/TIGER{dec}/TABBLOCK{d}/{zip_file.name}'
-            download(zip_file, url, unzip=False)
-
-            repl = {'geoid{d}':geoid, 'aland{d}': 'aland', 'awater{d}': 'awater', 'geometry':'geometry',}
-            df = ut.prep(gpd.read_file(zip_file)).rename(columns=repl)[repl.values()].to_crs(crs['bigquery'])
-            df.geometry = df.geometry.buffer(0).apply(orient, args=(1,))
+            df = self.fetch_census(fields=['name', *subpops.keys()], dataset='pl', year=dec, level='block')
+            df['county'] = df['name'].str.split(', ', expand=True)[3].str[:-7]
+            df = df.rename(columns=subpops)[[geoid, 'county', *subpops.values()]]
+            compute_other(df, 'tot_pop')
+            compute_other(df, 'vap_pop')
             self.bq.df_to_tbl(df, tbl)
         print(tbl, end=elipsis)
         return tbl
