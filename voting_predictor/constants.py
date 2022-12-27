@@ -13,12 +13,14 @@ crs = {
     'length'  : 'ESRI:102005', # meters
 }
 subpops = {
-    'p2_001n': 'all_tot_pop',
-    'p4_001n': 'all_vap_pop',
-    'p2_005n': 'white_tot_pop',
-    'p4_005n': 'white_vap_pop',
-    'p2_002n': 'hisp_tot_pop',
-    'p4_002n': 'hisp_vap_pop',
+    'all_tot_pop'  : 'p2_001n',
+    'all_vap_pop'  : 'p4_001n',
+    'white_tot_pop': 'p2_005n',
+    'white_vap_pop': 'p4_005n',
+    'hisp_tot_pop' : 'p2_002n',
+    'hisp_vap_pop' : 'p4_002n',
+    'other_tot_pop': None,
+    'other_vap_pop': None,
 }
 
 features = {

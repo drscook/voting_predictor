@@ -28,11 +28,11 @@ def download(file, url, unzip=True, overwrite=False):
     return file
 
 def get_geoid(df, year=2020, level='block'):
-    dec = str(get_decade(year))
-    geoid = level+dec
+    decade = str(get_decade(year))
+    geoid = level+decade
     df[geoid] = ''
     for level, k in levels.items():
-        for col in [level, level+'_'+dec]:
+        for col in [level, level+'_'+decade]:
             if col in df.columns:
                 df[geoid] += ut.rjust(df[col], k)
                 break
@@ -76,28 +76,32 @@ class Redistricter():
         geoid = get_geoid(df, year=year, level=level)
         return ut.prep(df[['year', geoid, *ut.prep(fields)]])
 
-    def get_path(self, tbl):
+    def parse(self, tbl):
         attr = tbl.split('.')[0]
         self.tbls[attr] = tbl
-        return self.data_path / attr
+        path = self.data_path / attr
 
+        g = tbl.split('_')[-1]
+        level, year = g[:-4], int(g[-4:])
+        decade = get_decade(year)
+        geoid = f'{level}{decade}'
+        
+        return path, geoid, level, year, decade
+        
 
-    def get_acs5(self, year=2018, level='tract', overwrite=False):
-        dec = get_decade(year)
-        geoid = f'{level}{dec}'
-        tbl = f'acs5.{self.state.abbr}{year}'
-        path = self.get_path(tbl)
+    @codetiming.Timer()
+    def get_acs5(self, level='tract', year=2018, overwrite=False):
+        tbl = f'acs5.{self.state.abbr}_{level}{year}'
+        path, geoid, level, year, decade = self.parse(tbl)
         if not self.bq.get_tbl(tbl, overwrite):
             tbl_raw = tbl+'_raw'
-            if not self.bq.get_tbl(tbl_raw, overwrite):
+            if not self.bq.get_tbl(tbl_raw):#, overwrite):
                 print(f'{tbl_raw} fetching', end=elipsis)
                 base = set().union(*self.features.values())
                 survey = {x for x in base if x[0]=='s'}
                 base = base.difference(survey)
                 B = self.fetch_census(fields=base  , dataset='acs5'  , year=year, level=level)
                 S = self.fetch_census(fields=survey, dataset='acs5st', year=year, level=level)
-                # self.B = B
-                # self.S = S
                 df = B.merge(S, on=['year', geoid])
                 for name, fields in self.features.items():
                     df[name] = df[fields].sum(axis=1)
@@ -105,16 +109,89 @@ class Redistricter():
                 for var in {name[name.find('_')+1:] for name in self.features.keys()}:
                     compute_other(df, var)
                 self.bq.df_to_tbl(df, tbl_raw)
-        #     self.bq.qry_to_tbl(qry, tbl)
-        # print(tbl, end=elipsis)
+            qry = f"""
+select
+    *,
+from
+    {tbl_raw} as A
+inner join (
+    select
+        {geoid},
+        all_tot_pop / sum(all_tot_pop) over (partition by {geoid}) as all_tot_prop,
+    from
+        {self.tbls['crosswalks']}
+    ) as C
+using
+    ({geoid})
+"""
+            # self.bq.qry_to_tbl(qry, tbl)
+        print(tbl, end=elipsis)
         return tbl
+
+    @codetiming.Timer()
+    def get_transformer(self, level='tract', year=2018, overwrite=False):
+        tbl = f'transformer.{self.state.abbr}_{level}{year}'
+        path, geoid, level, year, decade = self.parse(tbl)
+        if not self.bq.get_tbl(tbl, overwrite):
+            qry = f"""
+select
+    A.{geoid},
+    A.block2020,
+    A.block_group2020,
+    A.tract2020,
+    A.county2020,
+    A.state2020,
+    A.vtd2020,
+    {ut.make_select([f'case when B.{x} = 0 then 0 else A.{x} / B.{x} end as {x}' for x in subpops.keys()])},
+from
+    {self.get_crosswalks()} as A
+inner join (
+    select
+        {geoid},
+        {ut.make_select([f'sum({x}) as {x}' for x in subpops.keys()], 2)},
+    from
+        {self.get_crosswalks()}
+    group by
+        {geoid}
+    ) as B
+using
+    ({geoid})
+"""
+            print(f'{tbl} building', end=elipsis)
+            print(qry)
+            self.bq.qry_to_tbl(qry, tbl)
+        print(tbl, end=elipsis)
+        return tbl
+
+
+
+#     @codetiming.Timer()
+#     def transform(self, year=2018, level='tract', overwrite=False):
+#         dec = get_decade(year)
+#         tbl = f'transformed.{self.state.abbr}_{level}{year}'
+#         geoid, path = self.parse(tbl)
+#         if not self.bq.get_tbl(tbl, overwrite):
+#             C = self.get_crosswaks()
+#             A = self.get_acs5(year, level)
+#             qry = f"""
+# select
+#     C.*
+# from
+#     {self.tbls['crosswalks']} as C
+# inner join
+#     {self.tbls['geo']} as G
+# using
+#     (block2020)
+
+    
+            
+# """
 
 
     @codetiming.Timer()
     def get_crosswalks(self, overwrite=False):
-        tbl = f'crosswalks.{self.state.abbr}'
-        geoid = f'block2020'
-        path = self.get_path(tbl)
+        tbl = f'crosswalks.{self.state.abbr}_block2020'
+        path, geoid, level, year, decade = self.parse(tbl)
         if not self.bq.get_tbl(tbl, overwrite):
             tbl_raw = tbl+'_raw'
             if not self.bq.get_tbl(tbl_raw, overwrite):
@@ -130,19 +207,32 @@ class Redistricter():
                     df[f'aprop{dec}'] = df['aland'] / np.fmax(df.groupby(geoid)['aland'].transform('sum'), 1)
                 df = ut.prep(df[['block2010', 'block2020', 'aland', 'aprop2010', 'aprop2020']])
                 self.bq.df_to_tbl(df, tbl_raw)
-            self.get_geo()
-            print(f'{tbl} building', end=elipsis)
             qry = f"""
 select
-    A.*,
-    {ut.make_select([f'aprop2020 * {subpop} as {subpop}' for subpop in [*subpops.values(), 'other_tot_pop', 'other_vap_pop']])}
+    C.*,
+    A.vtd2010,
+    G.vtd2020,
+    div(block2010, 10000000000000) as state2010,
+    div(block2020, 10000000000000) as state2020,
+    div(block2010, 10000000000) as county2010,
+    div(block2020, 10000000000) as county2020,
+    div(block2010, 10000) as tract2010,
+    div(block2020, 10000) as tract2020,
+    div(block2010, 1000) as block_group2010,
+    div(block2020, 1000) as block_group2020,
+    {ut.make_select([f'C.aprop2020 * G.{subpop} as {subpop}' for subpop in subpops.keys()])}
 from
-    {tbl_raw} as A
+    {tbl_raw} as C
 inner join
-    {self.tbls['geo']} as G
+    {self.get_geo()} as G
 using
-    ({geoid})
+    (block2020)
+inner join
+    {self.get_assignments(year=2010)} as A
+using
+    (block2010)
 """
+            print(f'{tbl} building', end=elipsis)
             self.bq.qry_to_tbl(qry, tbl)
         print(tbl, end=elipsis)
         return tbl
@@ -150,24 +240,18 @@ using
 
     @codetiming.Timer()
     def get_geo(self, overwrite=False):
-        dec = 2020
-        geoid = f'block{dec}'
-        tbl = f'geo.{self.state.abbr}{dec}'
-        path = self.get_path(tbl)
+        tbl = f'geo.{self.state.abbr}_block2020'
+        path, geoid, level, year, decade = self.parse(tbl)
         if not self.bq.get_tbl(tbl, overwrite):
-            self.get_pl()
-            self.get_assignments()
-            self.get_shapes()
-            print(f'{tbl} fetching', end=elipsis)
             qry = f"""
 select
     * except (geometry),
     case when perim < 0.1 then 0 else 4 * {np.pi} * atot / (perim * perim) end as polsby_popper,
     geometry,
 from
-    {self.tbls['pl']} as P
+    {self.get_pl()} as P
 inner join
-    {self.tbls['assignments']} as A
+    {self.get_assignments()} as A
 using
     ({geoid})
 inner join (
@@ -177,32 +261,31 @@ inner join (
         st_area(geometry) as atot,
         st_perimeter(geometry) as perim,
     from
-        {self.tbls['shapes']}
+        {self.get_shapes()}
     ) as S
 using
     ({geoid})
 """
+            print(f'{tbl} fetching', end=elipsis)
             self.bq.qry_to_tbl(qry, tbl)
         return tbl
 
 
     @codetiming.Timer()
     def get_shapes(self, overwrite=False):
-        dec = 2020
-        geoid = f'block{dec}'
-        tbl = f'shapes.{self.state.abbr}{dec}'
-        path = self.get_path(tbl)
+        tbl = f'shapes.{self.state.abbr}_block2020'
+        path, geoid, level, year, decade = self.parse(tbl)
         if not self.bq.get_tbl(tbl, overwrite):
             print(f'{tbl} fetching', end=elipsis)
-            d = dec % 100
-            zip_file = path / f'tl_{dec}_{self.state.fips}_tabblock{d}.zip'
-            if dec == 2010:
-                url = f'https://www2.census.gov/geo/tiger/TIGER{dec}/TABBLOCK/{dec}/{zip_file.name}'
-            elif dec == 2020:
-                url = f'https://www2.census.gov/geo/tiger/TIGER{dec}/TABBLOCK{d}/{zip_file.name}'
+            d = decade % 100
+            zip_file = path / f'tl_{decade}_{self.state.fips}_tabblock{d}.zip'
+            if decade == 2010:
+                url = f'https://www2.census.gov/geo/tiger/TIGER{decade}/TABBLOCK/{decade}/{zip_file.name}'
+            elif decade == 2020:
+                url = f'https://www2.census.gov/geo/tiger/TIGER{decade}/TABBLOCK{d}/{zip_file.name}'
             download(zip_file, url, unzip=False)
 
-            repl = {'geoid{d}':geoid, 'aland{d}': 'aland', 'awater{d}': 'awater', 'geometry':'geometry',}
+            repl = {f'geoid{d}':geoid, f'aland{d}': 'aland', f'awater{d}': 'awater', 'geometry':'geometry',}
             df = ut.prep(gpd.read_file(zip_file)).rename(columns=repl)[repl.values()].to_crs(crs['bigquery'])
             df.geometry = df.geometry.buffer(0).apply(orient, args=(1,))
             self.bq.df_to_tbl(df, tbl)
@@ -211,21 +294,19 @@ using
 
 
     @codetiming.Timer()
-    def get_assignments(self, overwrite=False):
-        dec = 2020
-        geoid = f'block{dec}'
-        tbl = f'assignments.{self.state.abbr}{dec}'
-        path = self.get_path(tbl)
+    def get_assignments(self, year=2020, overwrite=False):
+        tbl = f'assignments.{self.state.abbr}_block{year}'
+        path, geoid, level, year, decade = self.parse(tbl)
         if not self.bq.get_tbl(tbl, overwrite):
             print(f'{tbl} fetching', end=elipsis)
             zip_file = path / f'BlockAssign_ST{self.state.fips}_{self.state.abbr}.zip'
-            if dec == 2010:
+            if decade == 2010:
                 url = f'https://www2.census.gov/geo/docs/maps-data/data/baf/{zip_file.name}'
-            elif dec == 2020:
-                url = f'https://www2.census.gov/geo/docs/maps-data/data/baf{dec}/{zip_file.name}'
+            elif decade == 2020:
+                url = f'https://www2.census.gov/geo/docs/maps-data/data/baf{decade}/{zip_file.name}'
             download(zip_file, url)
 
-            dist = {'VTD':f'vtd{dec}', 'CD':f'congress{dec-10}', 'SLDU':f'senate{dec-10}', 'SLDL':f'house{dec-10}'}
+            dist = {'VTD':f'vtd{decade}', 'CD':f'congress{decade-10}', 'SLDU':f'senate{decade-10}', 'SLDL':f'house{decade-10}'}
             L = []
             for abbr, name in dist.items():
                 f = zip_file.parent / f'{zip_file.stem}_{abbr}.txt'
@@ -243,15 +324,14 @@ using
 
     @codetiming.Timer()
     def get_pl(self, overwrite=False):
-        dec = 2020
-        geoid = f'block{dec}'
-        tbl = f'pl.{self.state.abbr}{dec}'
-        path = self.get_path(tbl)
+        tbl = f'pl.{self.state.abbr}_block2020'
+        path, geoid, level, year, decade = self.parse(tbl)
         if not self.bq.get_tbl(tbl, overwrite):
             print(f'{tbl} fetching', end=elipsis)
-            df = self.fetch_census(fields=['name', *subpops.keys()], dataset='pl', year=dec, level='block')
+            repl = {v:k for k,v in subpops.items() if v}
+            df = self.fetch_census(fields=['name', *repl.keys()], dataset='pl', year=year, level='block')
             df['county'] = df['name'].str.split(', ', expand=True)[3].str[:-7]
-            df = df.rename(columns=subpops)[[geoid, 'county', *subpops.values()]]
+            df = df.rename(columns=repl)[[geoid, 'county', *repl.values()]]
             compute_other(df, 'tot_pop')
             compute_other(df, 'vap_pop')
             self.bq.df_to_tbl(df, tbl)
