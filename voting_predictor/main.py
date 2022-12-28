@@ -87,10 +87,12 @@ class Redistricter():
 
 
     def get_final(self, extra_cols=None, overwrite=False):
+        if self.state.abbr != 'TX':
+            return False
         tbl = f'final.{self.state.abbr}_vtd2020'
         path, geoid, level, year, decade = self.parse(tbl)
         if not self.bq.get_tbl(tbl, overwrite):
-                qry = f"""
+            qry = f"""
 select
     campaign,
     string_agg(candidate, " v " order by party) as candidates
@@ -107,13 +109,13 @@ from (
         and year >= 2015
 )
 group by campaign"""
-                # print(qry)
-                campaigns = ut.listify(self.bq.qry_to_df(qry))
+            # print(qry)
+            campaigns = ut.listify(self.bq.qry_to_df(qry))
 
-                L = []
-                for campaign, candidates in campaigns:
-                    office, year = campaign.split('_')
-                    qry = f"""
+            L = []
+            for campaign, candidates in campaigns:
+                office, year = campaign.split('_')
+                qry = f"""
 select 
     A.*,
     "{campaign}" as campaign,
@@ -129,8 +131,8 @@ left join (
 ) as B
 using ({geoid})
 """
-                    L.append(qry)   
-                qry = ut.join(L, '\nunion all\n')
+                L.append(qry)   
+            qry = ut.join(L, '\nunion all\n')
             # print(qry)
             with Timer():
                 rpt(tbl)
