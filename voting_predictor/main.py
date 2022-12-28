@@ -127,7 +127,7 @@ from {self.transform_acs5(year=year, level="vtd", extra_cols=extra_cols)} as A
 left join (
     select {geoid}, party, votes,
     from {self.get_elections()}
-    where campaign = "{campaign}")
+    where office = "{office}" and year = {year})
     pivot(sum(votes) for party in ("D", "R")
 ) as B
 using ({geoid})
