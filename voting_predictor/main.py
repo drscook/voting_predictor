@@ -36,7 +36,6 @@ def get_geoid(df, year=2020, level='block'):
             if col in df.columns:
                 df[geoid] += ut.rjust(df[col], k)
                 break
-    # df[geoid] = ut.prep(df[geoid])
     return geoid
 
 def compute_other(df, feat):
@@ -87,47 +86,56 @@ class Redistricter():
         return path, geoid, level, year, decade
 
 
-    # def extract_dataset(self, election='President_2020_general', extra_cols=None, overwrite=False):
-    def extract_dataset(self, extra_cols=None, overwrite=False):
-        geoid = 'vtd2020'
-        qry = f"""
-select distinct campaign, 
-from {self.get_elections()}
-where office in ('Governor', 'USSen', 'President', 'Comptroller', 'AttorneyGen', 'LtGovernor')
-      and election='general' and party in ('D', 'R') and year >= 2015"""
-        print(qry)
-        campaigns = self.bq.qry_to_df(qry).squeeze().tolist()
+    def get_final(self, extra_cols=None, overwrite=False):
+        tbl = f'final.{self.state.abbr}_vtd2020'
+        path, geoid, level, year, decade = self.parse(tbl)
+        if not self.bq.get_tbl(tbl, overwrite):
+            with Timer():
+                rpt(tbl)
+                qry = f"""
+select
+    campaign,
+    string_agg(candidate, " v " order by party) as candidates
+from (
+    select distinct
+        office||"_"||year as campaign,
+        name||"_"||party as candidate,
+        party,
+    from {self.get_elections()}
+    where
+        office in ("Governor", "USSen", "President", "Comptroller", "AttorneyGen", "LtGovernor")
+        and election = "general"
+        and party in ("D", "R")
+        and year >= 2015
+)
+group by campaign"""
+                # print(qry)
+                campaigns = ut.listify(self.bq.qry_to_df(qry))
 
-#         for x in campaigns:
-#             office, year, election = x.split('_')
-#             qry = f"""
-# select *
-# from {self.transform_acs5(year=year, extra_cols=extra_cols)} as A
-# left join (
-#     select {geoid}, campaign, votes
-#     from {self.get_elections()}
-#     where campaign in {campaigns})
-#     pivot(sum(votes) for campaign in {campaigns})
-# using ({geoid})"""
-#             print(qry)
-#             df = self.bq.qry_to_df(qry).fillna(0)
-    #         return df
-        
-        
-        return campaigns
-        
-#         qry = f"""
-# select *
-# from {self.transform_acs5(year=year, extra_cols=extra_cols)} as A
-# left join (
-#     select {geoid}, campaign, votes
-#     from {self.get_elections()}
-#     where campaign in {campaigns})
-#     pivot(sum(votes) for campaign in {campaigns})
-# using ({geoid})"""
-#         print(qry)
-#         df = self.bq.qry_to_df(qry).fillna(0)
-#         return df
+                L = []
+                for campaign, candidates in campaigns:
+                    office, year = campaign.split('_')
+                    qry = f"""
+select 
+    A.*,
+    "{campaign}" as campaign,
+    "{candidates}" as candidates,
+    coalesce(B.D, 0) as dem_votes,
+    coalesce(B.R, 0) as rep_votes,
+from {self.transform_acs5(year=year, level="vtd", extra_cols=extra_cols)} as A
+left join (
+    select {geoid}, party, votes,
+    from {self.get_elections()}
+    where campaign = "{campaign}")
+    pivot(sum(votes) for party in ("D", "R")
+) as B
+using ({geoid})
+"""
+                    L.append(qry)   
+                qry = ut.join(L, '\nunion all\n')
+                # print(qry)
+                self.bq.qry_to_tbl(qry, tbl)
+        return tbl
 
 
     def transform_acs5(self, year=2018, level='vtd', extra_cols=None, overwrite=False):
@@ -139,13 +147,13 @@ where office in ('Governor', 'USSen', 'President', 'Comptroller', 'AttorneyGen',
             qry = f"""
 select
     A.*,
-    county2020,
-    dist_to_border,
-    aland,
-    awater,
-    atot,
-    perim,
-    polsby_popper,
+    G.county2020,
+    G.dist_to_border,
+    G.aland,
+    G.awater,
+    G.atot,
+    G.perim,
+    G.polsby_popper,
     {ut.make_select(extra_cols)}
 from (
     select
@@ -156,8 +164,8 @@ from (
     inner join {self.get_transformer(year=year_src, level=level_src)} as T
     using ({geoid_src})
     group by 1, 2
-    ) as A
-join {self.get_geo(level=level)} as B
+) as A
+join {self.get_geo(level=level)} as G
 using ({geoid})"""
             # print(qry)
             with Timer():
@@ -206,7 +214,7 @@ inner join (
     select {geoid}, {ut.make_select([f'sum({x}) as {x}' for x in subpops.keys()], 2)},
     from {self.get_crosswalks()}
     group by {geoid}
-    ) as B
+) as B
 using ({geoid})"""
             # print(qry)
             with Timer():
@@ -294,8 +302,9 @@ using (block2010)"""
             qry = f"""
 select
     coalesce(B.vtd2020, C.vtd2020) as vtd2020,
+    --A.office||"_"||A.year as campaign,
+    --A.office||"_"||A.year||"_"||A.election||"_"||A.name||"_"||A.party as campaign,
     A.* except (vtd2020, votes),
-    A.office || '_' || A.year || '_' || A.election || '_' || A.name || '_' || A.party as campaign,
     sum(A.votes) as votes,
     sum(coalesce(B.all_tot_pop, C.all_tot_pop)) as all_tot_pop,
 from {tbl_raw} as A
