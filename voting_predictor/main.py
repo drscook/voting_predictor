@@ -91,12 +91,29 @@ class Redistricter():
     def extract_dataset(self, extra_cols=None, overwrite=False):
         geoid = 'vtd2020'
         qry = f"""
-select distinct campaign
+select distinct campaign, 
 from {self.get_elections()}
 where office in ('Governor', 'USSen', 'President', 'Comptroller', 'AttorneyGen', 'LtGovernor')
       and election='general' and party in ('D', 'R') and year >= 2015"""
         print(qry)
-        campaigns = tuple(self.bq.qry_to_df(qry).squeeze().tolist())
+        campaigns = self.bq.qry_to_df(qry).squeeze().tolist()
+
+#         for x in campaigns:
+#             office, year, election = x.split('_')
+#             qry = f"""
+# select *
+# from {self.transform_acs5(year=year, extra_cols=extra_cols)} as A
+# left join (
+#     select {geoid}, campaign, votes
+#     from {self.get_elections()}
+#     where campaign in {campaigns})
+#     pivot(sum(votes) for campaign in {campaigns})
+# using ({geoid})"""
+#             print(qry)
+#             df = self.bq.qry_to_df(qry).fillna(0)
+    #         return df
+        
+        
         return campaigns
         
 #         qry = f"""
