@@ -90,8 +90,6 @@ class Redistricter():
         tbl = f'final.{self.state.abbr}_vtd2020'
         path, geoid, level, year, decade = self.parse(tbl)
         if not self.bq.get_tbl(tbl, overwrite):
-            with Timer():
-                rpt(tbl)
                 qry = f"""
 select
     campaign,
@@ -133,7 +131,9 @@ using ({geoid})
 """
                     L.append(qry)   
                 qry = ut.join(L, '\nunion all\n')
-                # print(qry)
+            # print(qry)
+            with Timer():
+                rpt(tbl)
                 self.bq.qry_to_tbl(qry, tbl)
         return tbl
 
