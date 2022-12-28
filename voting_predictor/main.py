@@ -87,25 +87,30 @@ class Redistricter():
         return path, geoid, level, year, decade
 
 
-    def extract_dataset(self, election='2020_general_pres', extra_cols=None, overwrite=False):
-        year, election, office = elec.split('_')
+    # def extract_dataset(self, election='President_2020_general', extra_cols=None, overwrite=False):
+    def extract_dataset(self, extra_cols=None, overwrite=False):
         geoid = 'vtd2020'
         qry = f"""
 select distinct campaign
 from {self.get_elections()}
-where year={year} and election={election} and office={office} and party in ('D', 'R')
-"""
-        campaigns = self.bq.qry_to_df(qry).squeeze()
+where office in ('Governor', 'USSen', 'President', 'Comptroller', 'AttorneyGen', 'LtGovernor')
+      and election='general' and party in ('D', 'R') and year >= 2015"""
+        print(qry)
+        campaigns = tuple(self.bq.qry_to_df(qry).squeeze().tolist())
+        return campaigns
         
-        qry = f"""
-select {geoid}, campaign, votes
-from {self.get_elections()}
---where year={year} and election={election} and office={office} and party in ('D', 'R')
-where campaign in {campaigns}
-pivot(sum(votes) for campaign in {campaigns})
-"""
-
-
+#         qry = f"""
+# select *
+# from {self.transform_acs5(year=year, extra_cols=extra_cols)} as A
+# left join (
+#     select {geoid}, campaign, votes
+#     from {self.get_elections()}
+#     where campaign in {campaigns})
+#     pivot(sum(votes) for campaign in {campaigns})
+# using ({geoid})"""
+#         print(qry)
+#         df = self.bq.qry_to_df(qry).fillna(0)
+#         return df
 
 
     def transform_acs5(self, year=2018, level='vtd', extra_cols=None, overwrite=False):
@@ -136,8 +141,7 @@ from (
     group by 1, 2
     ) as A
 join {self.get_geo(level=level)} as B
-using ({geoid})
-"""
+using ({geoid})"""
             # print(qry)
             with Timer():
                 rpt(tbl)
@@ -169,10 +173,11 @@ using ({geoid})
     def get_transformer(self, year=2018, level='tract', overwrite=False):
         tbl = f'transformers.{self.state.abbr}_{level}{year}'
         path, geoid, level, year, decade = self.parse(tbl)
+
         if not self.bq.get_tbl(tbl, overwrite):
             qry = f"""
 select
-    A.{geoid},
+    {geoid+',' if year<2020 else ''}
     A.block2020,
     A.block_group2020,
     A.tract2020,
@@ -250,42 +255,37 @@ using (block2010)"""
                     download(zip_file, url)
 
                     L = []
-                    cols = ['year', 'county', 'fips', 'vtd', 'election', 'office', 'name', 'party', 'incumbent', 'votes']
+                    cols = ['vtd2020', 'county2020', 'fips', 'office', 'year', 'election', 'name', 'party', 'incumbent', 'votes']                    
                     for file in path.iterdir():
                         a = ut.prep(file.stem.split('_'))
                         if a[-1] == 'returns':
-                            df = ut.prep(pd.read_csv(file))
+                            df = ut.prep(pd.read_csv(file)).rename(columns={'vtd':'vtd2020', 'county':'county2020'})
                             mask = (df['votes'] > 0) & (df['party'].isin(('R', 'D', 'L', 'G')))
                             if mask.any():
+                                repl = {(' ', '.', ','): ''}
+                                df['vtd2020'] = ut.rjust(df['vtd2020'], 6)
+                                df['fips'] = self.state.fips + ut.rjust(df['fips'], 3)
+                                df['office'] = ut.replace(df['office'], repl)
                                 df['year'] = int(a[0])
                                 df['election'] = ut.join(a[1:-2], '_')
+                                df['name'] = ut.replace(df['name'], repl)
                                 df['incumbent'] = df['incumbent'] == 'Y'
                                 L.append(df.loc[mask, cols])
                     df = ut.prep(pd.concat(L, axis=0)).reset_index(drop=True)
-                    df['vtd'] = ut.rjust(df['vtd'], 6)
-                    df['fips'] = self.state.fips + ut.rjust(df['fips'], 3)
-                    self.bq.df_to_tbl(df, tbl_raw)
+                    self.bq.df_to_tbl(df[cols], tbl_raw)
 
             qry = f"""
 select
-    A.year,
-    --coalesce(B.vtd2020, C.vtd2020, A.fips || A.vtd) as vtd2020,
     coalesce(B.vtd2020, C.vtd2020) as vtd2020,
-    A.fips,
-    A.county,
-    A.election,
-    replace(replace(replace(A.office, ' ', ''), '.', ''), ',', '') as office,
-    replace(A.name, ' ', '') as name,
-    upper(A.party) as party,
-    A.incumbent,
-    A.year || '_' || A.election || '_' || A.office || '_' || A.name || '_' || A.party as campaign,
+    A.* except (vtd2020, votes),
+    A.office || '_' || A.year || '_' || A.election || '_' || A.name || '_' || A.party as campaign,
     sum(A.votes) as votes,
     sum(coalesce(B.all_tot_pop, C.all_tot_pop)) as all_tot_pop,
 from {tbl_raw} as A
-left join {self.get_geo('vtd2020')} as B
-on A.fips || A.vtd = B.vtd2020
-left join {self.get_geo('vtd2020')} as C
-on A.fips || '0' || left(A.vtd, 5) = C.vtd2020
+left join {self.get_geo('vtd')} as B
+on A.fips || A.vtd2020 = B.vtd2020
+left join {self.get_geo('vtd')} as C
+on A.fips || '0' || left(A.vtd2020, 5) = C.vtd2020
 group by 1,2,3,4,5,6,7,8,9,10"""
             # print(qry)
             with Timer():
