@@ -305,8 +305,6 @@ using (block2010)"""
             qry = f"""
 select
     coalesce(B.vtd2020, C.vtd2020) as vtd2020,
-    --A.office||"_"||A.year as campaign,
-    --A.office||"_"||A.year||"_"||A.election||"_"||A.name||"_"||A.party as campaign,
     A.* except (vtd2020, votes),
     sum(A.votes) as votes,
     sum(coalesce(B.all_tot_pop, C.all_tot_pop)) as all_tot_pop,
@@ -315,7 +313,7 @@ left join {self.get_geo('vtd')} as B
 on A.fips || A.vtd2020 = B.vtd2020
 left join {self.get_geo('vtd')} as C
 on A.fips || '0' || left(A.vtd2020, 5) = C.vtd2020
-group by 1,2,3,4,5,6,7,8,9,10"""
+group by 1,2,3,4,5,6,7,8,9"""
             # print(qry)
             with Timer():
                 rpt(tbl)
