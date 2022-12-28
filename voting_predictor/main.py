@@ -92,6 +92,7 @@ class Redistricter():
         tbl = f'final.{self.state.abbr}_vtd2020'
         path, geoid, level, year, decade = self.parse(tbl)
         if not self.bq.get_tbl(tbl, overwrite):
+
             qry = f"""
 select
     campaign,
