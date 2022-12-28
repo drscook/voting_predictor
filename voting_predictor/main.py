@@ -11,6 +11,9 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 def get_decade(year):
     return int(year) // 10 * 10
 
+def rpt(tbl):
+    print(f'creating {tbl}', end=ellipsis)
+
 def download(file, url, unzip=True, overwrite=False):
     """Help download data from internet sources"""
     if overwrite:
@@ -19,9 +22,9 @@ def download(file, url, unzip=True, overwrite=False):
         print(f'downloading from {url}', end=ellipsis)
         ut.mkdir(file.parent)
         os.system(f'wget -O {file} {url}')
-        print('done!')
         if unzip:
             ut.unzipper(file)
+        print('done', end=ellipsis)
     return file
 
 def get_geoid(df, year=2020, level='block'):
@@ -84,111 +87,86 @@ class Redistricter():
         return path, geoid, level, year, decade
 
 
-    def get_elections(self, overwrite=False):
-        if self.state.abbr != 'TX':
-            return False
-        tbl = f'elections.{self.state.abbr}_vtd2022'
-        path, geoid, level, year, decade = self.parse(tbl)
-        if not self.bq.get_tbl(tbl, overwrite):
-            tbl_raw = tbl + '_raw'
-            if not self.bq.get_tbl(tbl_raw, overwrite):
-                print(f'getting {tbl_raw}')
-                zip_file = path / f'2020-general-vtd-election-data-2020.zip'
-                url = f'https://data.capitol.texas.gov/dataset/35b16aee-0bb0-4866-b1ec-859f1f044241/resource/5af9f5e2-ca14-4e5d-880e-3c3cd891d3ed/download/{zip_file.name}'
-                download(zip_file, url)
-
-                L = []
-                cols = ['year', 'county', 'fips', 'vtd', 'election', 'office', 'name', 'party', 'incumbent', 'votes']
-                for file in path.iterdir():
-                    a = ut.prep(file.stem.split('_'))
-                    if a[-1] == 'returns':
-                        df = ut.prep(pd.read_csv(file))
-                        mask = (df['votes'] > 0) & (df['party'].isin(('R', 'D', 'L', 'G')))
-                        if mask.any():
-                            df['year'] = int(a[0])
-                            df['election'] = ut.join(a[1:-2], '_')
-                            df['incumbent'] = df['incumbent'] == 'Y'
-                            L.append(df.loc[mask, cols])
-                df = ut.prep(pd.concat(L, axis=0)).reset_index(drop=True)
-                # df['vtd'] = df['vtd'].astype('string')
-                df['vtd'] = ut.rjust(df['vtd'], 6)
-                df['fips'] = self.state.fips + ut.rjust(df['fips'], 3)
-                self.bq.df_to_tbl(df, tbl_raw)
-            qry = f"""
-select
-    A.year,
-    --coalesce(B.vtd2020, C.vtd2020, A.fips || A.vtd) as vtd2020,
-    coalesce(B.vtd2020, C.vtd2020) as vtd2020,
-    A.fips,
-    A.county,
-    A.election,
-    replace(replace(replace(A.office, ' ', ''), '.', ''), ',', '') as office,
-    replace(A.name, ' ', '') as name,
-    upper(A.party) as party,
-    A.incumbent,
-    A.year || '_' || A.election || '_' || A.office || '_' || A.name || '_' | |A.party as campaign,
-    sum(A.votes) as votes,
-    sum(coalesce(B.all_tot_pop, C.all_tot_pop)) as all_tot_pop,
-from {tbl_raw} as A
-left join {self.get_geo()} as B
-on A.fips || A.vtd = B.vtd2020
-left join {self.get_geo()} as C
-on A.fips || '0' || left(A.vtd, 5) = C.vtd2020
-group by 1,2,3,4,5,6,7,8,9,10"""
-            # print(qry)
-            self.bq.qry_to_tbl(qry, tbl)
-        return tbl
+    def extract_dataset(self, election='2020_general_pres', extra_cols=None, overwrite=False):
+        year, election, office = elec.split('_')
+        geoid = 'vtd2020'
+        qry = f"""
+select distinct campaign
+from {self.get_elections()}
+where year={year} and election={election} and office={office} and party in ('D', 'R')
+"""
+        campaigns = self.bq.qry_to_df(qry).squeeze()
+        
+        qry = f"""
+select {geoid}, campaign, votes
+from {self.get_elections()}
+--where year={year} and election={election} and office={office} and party in ('D', 'R')
+where campaign in {campaigns}
+pivot(sum(votes) for campaign in {campaigns})
+"""
 
 
-    def transform_acs5(self, level='tract', year=2018, targ='vtd2020', overwrite=False):
-        tbl_raw = self.get_acs5(level=level, year=year)
-        path, geoid, level, year, decade = self.parse(tbl_raw)
-        tbl = tbl_raw + '_' + targ
+
+
+    def transform_acs5(self, year=2018, level='vtd', extra_cols=None, overwrite=False):
+        tbl_src  = self.get_acs5(year=year)
+        tbl = f'{tbl_src}_{level}2020'
+        path_src, geoid_src, level_src, year_src, decade_src = self.parse(tbl_src)
+        path    , geoid    , level    , year    , decade     = self.parse(tbl)
         if not self.bq.get_tbl(tbl, overwrite):
             qry = f"""
 select
-    year,
-    {targ},
+    A.*,
     county2020,
-    {ut.make_select([f'sum({x}) over (partition by {targ}) as {x}' for x in features.keys()])},
-    row_number() over (partition by {targ} order by all_tot_pop desc) as r,
+    dist_to_border,
+    aland,
+    awater,
+    atot,
+    perim,
+    polsby_popper,
+    {ut.make_select(extra_cols)}
 from (
     select
         A.year,
-        T.{targ},
-        T.county2020,
+        T.{geoid},
         {ut.make_select([f'sum(A.{x} * T.{x[:x.rfind("_")]}_pop) as {x}' for x in features.keys()], 2)},
-    from {tbl_raw} as A
-    inner join {self.get_transformer(level=level, year=year)} as T
-    using ({geoid})
-    group by 1, 2, 3
-    ) as B
-qualify r = 1"""
+    from {tbl_src} as A
+    inner join {self.get_transformer(year=year_src, level=level_src)} as T
+    using ({geoid_src})
+    group by 1, 2
+    ) as A
+join {self.get_geo(level=level)} as B
+using ({geoid})
+"""
             # print(qry)
-            self.bq.qry_to_tbl(qry, tbl)
+            with Timer():
+                rpt(tbl)
+                self.bq.qry_to_tbl(qry, tbl)
         return tbl
 
 
-    def get_acs5(self, level='tract', year=2018, overwrite=False):
-        tbl = f'acs5.{self.state.abbr}_{level}{year}'
+    def get_acs5(self, year=2018, overwrite=False):
+        tbl = f'acs5.{self.state.abbr}_tract{year}'
         path, geoid, level, year, decade = self.parse(tbl)
         if not self.bq.get_tbl(tbl, overwrite):
-            base = set().union(*features.values())
-            survey = {x for x in base if x[0]=='s'}
-            base = base.difference(survey)
-            B = self.fetch_census(fields=base  , dataset='acs5'  , year=year, level=level)
-            S = self.fetch_census(fields=survey, dataset='acs5st', year=year, level=level)
-            df = ut.prep(B.merge(S, on=['year', geoid]))
-            for name, fields in features.items():
-                df[name] = df[fields].sum(axis=1)
-            df = df[['year', geoid, *features.keys()]]
-            for var in {name[name.find('_')+1:] for name in features.keys()}:
-                compute_other(df, var)
-            self.bq.df_to_tbl(df, tbl)
+            with Timer():
+                rpt(tbl)
+                base = set().union(*features.values())
+                survey = {x for x in base if x[0]=='s'}
+                base = base.difference(survey)
+                B = self.fetch_census(fields=base  , dataset='acs5'  , year=year, level=level)
+                S = self.fetch_census(fields=survey, dataset='acs5st', year=year, level=level)
+                df = ut.prep(B.merge(S, on=['year', geoid]))
+                for name, fields in features.items():
+                    df[name] = df[fields].sum(axis=1)
+                df = df[['year', geoid, *features.keys()]]
+                for var in {name[name.find('_')+1:] for name in features.keys()}:
+                    compute_other(df, var)
+                self.bq.df_to_tbl(df, tbl)
         return tbl
 
 
-    def get_transformer(self, level='tract', year=2018, overwrite=False):
+    def get_transformer(self, year=2018, level='tract', overwrite=False):
         tbl = f'transformers.{self.state.abbr}_{level}{year}'
         path, geoid, level, year, decade = self.parse(tbl)
         if not self.bq.get_tbl(tbl, overwrite):
@@ -209,7 +187,9 @@ inner join (
     ) as B
 using ({geoid})"""
             # print(qry)
-            self.bq.qry_to_tbl(qry, tbl)
+            with Timer():
+                rpt(tbl)
+                self.bq.qry_to_tbl(qry, tbl)
         return tbl
 
 
@@ -219,17 +199,19 @@ using ({geoid})"""
         if not self.bq.get_tbl(tbl, overwrite):
             tbl_raw = tbl+'_raw'
             if not self.bq.get_tbl(tbl_raw, overwrite):
-                zip_file = path / f'TAB2010_TAB2020_ST{self.state.fips}.zip'
-                url = f'https://www2.census.gov/geo/docs/maps-data/data/rel2020/t10t20/{zip_file.name}'
-                download(zip_file, url)
-            
-                txt = zip_file.with_name(f'{zip_file.stem}_{self.state.abbr}.txt'.lower())
-                df = ut.prep(pd.read_csv(txt, sep='|')).rename(columns={'arealand_int': 'aland', 'blk_2010': 'block_2010', 'blk_2020': 'block_2020'})
-                for dec in [2010, 2020]:
-                    geoid = get_geoid(df, dec)
-                    df[f'aprop{dec}'] = df['aland'] / np.fmax(df.groupby(geoid)['aland'].transform('sum'), 1)
-                df = ut.prep(df[['block2010', 'block2020', 'aland', 'aprop2010', 'aprop2020']])
-                self.bq.df_to_tbl(df, tbl_raw)
+                with Timer():
+                    rpt(tbl_raw)
+                    zip_file = path / f'TAB2010_TAB2020_ST{self.state.fips}.zip'
+                    url = f'https://www2.census.gov/geo/docs/maps-data/data/rel2020/t10t20/{zip_file.name}'
+                    download(zip_file, url)
+                
+                    txt = zip_file.with_name(f'{zip_file.stem}_{self.state.abbr}.txt'.lower())
+                    df = ut.prep(pd.read_csv(txt, sep='|')).rename(columns={'arealand_int': 'aland', 'blk_2010': 'block_2010', 'blk_2020': 'block_2020'})
+                    for dec in [2010, 2020]:
+                        geoid = get_geoid(df, dec)
+                        df[f'aprop{dec}'] = df['aland'] / np.fmax(df.groupby(geoid)['aland'].transform('sum'), 1)
+                    df = ut.prep(df[['block2010', 'block2020', 'aland', 'aprop2010', 'aprop2020']])
+                    self.bq.df_to_tbl(df, tbl_raw)
             qry = f"""
 select
     C.*,
@@ -247,7 +229,68 @@ using (block2020)
 left join {self.get_assignments(year=2010)} as A
 using (block2010)"""
             # print(qry)
-            self.bq.qry_to_tbl(qry, tbl)
+            with Timer():
+                rpt(tbl)
+                self.bq.qry_to_tbl(qry, tbl)
+        return tbl
+
+
+    def get_elections(self, overwrite=False):
+        if self.state.abbr != 'TX':
+            return False
+        tbl = f'elections.{self.state.abbr}_vtd2022'
+        path, geoid, level, year, decade = self.parse(tbl)
+        if not self.bq.get_tbl(tbl, overwrite):
+            tbl_raw = tbl + '_raw'
+            if not self.bq.get_tbl(tbl_raw, overwrite):
+                with Timer():
+                    rpt(tbl_raw)
+                    zip_file = path / f'2020-general-vtd-election-data-2020.zip'
+                    url = f'https://data.capitol.texas.gov/dataset/35b16aee-0bb0-4866-b1ec-859f1f044241/resource/5af9f5e2-ca14-4e5d-880e-3c3cd891d3ed/download/{zip_file.name}'
+                    download(zip_file, url)
+
+                    L = []
+                    cols = ['year', 'county', 'fips', 'vtd', 'election', 'office', 'name', 'party', 'incumbent', 'votes']
+                    for file in path.iterdir():
+                        a = ut.prep(file.stem.split('_'))
+                        if a[-1] == 'returns':
+                            df = ut.prep(pd.read_csv(file))
+                            mask = (df['votes'] > 0) & (df['party'].isin(('R', 'D', 'L', 'G')))
+                            if mask.any():
+                                df['year'] = int(a[0])
+                                df['election'] = ut.join(a[1:-2], '_')
+                                df['incumbent'] = df['incumbent'] == 'Y'
+                                L.append(df.loc[mask, cols])
+                    df = ut.prep(pd.concat(L, axis=0)).reset_index(drop=True)
+                    df['vtd'] = ut.rjust(df['vtd'], 6)
+                    df['fips'] = self.state.fips + ut.rjust(df['fips'], 3)
+                    self.bq.df_to_tbl(df, tbl_raw)
+
+            qry = f"""
+select
+    A.year,
+    --coalesce(B.vtd2020, C.vtd2020, A.fips || A.vtd) as vtd2020,
+    coalesce(B.vtd2020, C.vtd2020) as vtd2020,
+    A.fips,
+    A.county,
+    A.election,
+    replace(replace(replace(A.office, ' ', ''), '.', ''), ',', '') as office,
+    replace(A.name, ' ', '') as name,
+    upper(A.party) as party,
+    A.incumbent,
+    A.year || '_' || A.election || '_' || A.office || '_' || A.name || '_' || A.party as campaign,
+    sum(A.votes) as votes,
+    sum(coalesce(B.all_tot_pop, C.all_tot_pop)) as all_tot_pop,
+from {tbl_raw} as A
+left join {self.get_geo('vtd2020')} as B
+on A.fips || A.vtd = B.vtd2020
+left join {self.get_geo('vtd2020')} as C
+on A.fips || '0' || left(A.vtd, 5) = C.vtd2020
+group by 1,2,3,4,5,6,7,8,9,10"""
+            # print(qry)
+            with Timer():
+                rpt(tbl)
+                self.bq.qry_to_tbl(qry, tbl)
         return tbl
 
 
@@ -307,124 +350,129 @@ from (
         )
     ) as S
 join (
-    select {geoid}, {ut.join([f"sum({col}) as {col}" for col in pop_cols])},
+    select
+        {geoid},
+        {ut.make_select([f"sum({col}) as {col}" for col in pop_cols], 2)},
     from {tbl_raw}
     group by {geoid}
 ) as P
 using ({geoid})
 join (
-    select {geoid}, {ut.join(district_cols)}
+    select
+        {geoid},
+        {ut.make_select(district_cols, 2)},
     from {tbl_raw}
     qualify row_number() over (partition by {geoid} order by all_tot_pop desc) = 1
 ) as D
 using ({geoid})"""
             # print(qry)
-            self.bq.qry_to_tbl(qry, tbl)
-        print(tbl, end=ellipsis)
+            with Timer():
+                rpt(tbl)
+                self.bq.qry_to_tbl(qry, tbl)
         return tbl
 
 
-    @codetiming.Timer()
     def get_plans(self, overwrite=False):
         if self.state.abbr != 'TX':
             return False
         tbl = f'plans.{self.state.abbr}_block2020'
         path, geoid, level, year, decade = self.parse(tbl)
         if not self.bq.get_tbl(tbl, overwrite):
-            district_types = {'s':31, 'h':150, 'c':38}
-            browser = mechanicalsoup.Browser()
-            for dt in district_types.keys():
-                not_found = 0
-                for k in range(1000):
-                    not_found += 1
-                    proposal = f'plan{dt}{2100+k}'
-                    root_url = f'https://data.capitol.texas.gov/dataset/{proposal}#'
-                    login_page = browser.get(root_url)
-                    tag = login_page.soup.select('a')
-                    if len(tag) >= 10:
-                        not_found = 0
-                        for t in tag:
-                            url = t['href']
-                            if 'blk.zip' in url:
-                                zip_file = path / url.split('/')[-1]
-                                download(zip_file, url)
-                    if not_found > 15:
-                        break
-            for file in path.iterdir():
-                ut.unzipper(file)
-            L = []
-            for file in path.iterdir():
-                if file.suffix == '.csv':
-                    plan = ut.prep(file.stem)
-                    df = ut.prep(pd.read_csv(file, names=[geoid, plan], header=0)).set_index(geoid)
-                    if df[plan].nunique() == district_types[plan[4]]:
-                        L.append(df)
-            df = ut.prep(pd.concat(L, axis=1))
-            self.bq.df_to_tbl(df, tbl)
-        print(tbl, end=ellipsis)
+            with Timer():
+                rpt(tbl)
+                district_types = {'s':31, 'h':150, 'c':38}
+                browser = mechanicalsoup.Browser()
+                for dt in district_types.keys():
+                    not_found = 0
+                    for k in range(1000):
+                        not_found += 1
+                        proposal = f'plan{dt}{2100+k}'
+                        root_url = f'https://data.capitol.texas.gov/dataset/{proposal}#'
+                        login_page = browser.get(root_url)
+                        tag = login_page.soup.select('a')
+                        if len(tag) >= 10:
+                            not_found = 0
+                            for t in tag:
+                                url = t['href']
+                                if 'blk.zip' in url:
+                                    zip_file = path / url.split('/')[-1]
+                                    download(zip_file, url)
+                        if not_found > 15:
+                            break
+                for file in path.iterdir():
+                    ut.unzipper(file)
+                L = []
+                for file in path.iterdir():
+                    if file.suffix == '.csv':
+                        plan = ut.prep(file.stem)
+                        df = ut.prep(pd.read_csv(file, names=[geoid, plan], header=0)).set_index(geoid)
+                        if df[plan].nunique() == district_types[plan[4]]:
+                            L.append(df)
+                df = ut.prep(pd.concat(L, axis=1))
+                self.bq.df_to_tbl(df, tbl)
         return tbl
 
 
-    @codetiming.Timer()
     def get_assignments(self, year=2020, overwrite=False):
         tbl = f'assignments.{self.state.abbr}_block{year}'
         path, geoid, level, year, decade = self.parse(tbl)
         if not self.bq.get_tbl(tbl, overwrite):
-            zip_file = path / f'BlockAssign_ST{self.state.fips}_{self.state.abbr}.zip'
-            if decade == 2010:
-                url = f'https://www2.census.gov/geo/docs/maps-data/data/baf/{zip_file.name}'
-            elif decade == 2020:
-                url = f'https://www2.census.gov/geo/docs/maps-data/data/baf{decade}/{zip_file.name}'
-            download(zip_file, url)
+            with Timer():
+                rpt(tbl)
+                zip_file = path / f'BlockAssign_ST{self.state.fips}_{self.state.abbr}.zip'
+                if decade == 2010:
+                    url = f'https://www2.census.gov/geo/docs/maps-data/data/baf/{zip_file.name}'
+                elif decade == 2020:
+                    url = f'https://www2.census.gov/geo/docs/maps-data/data/baf{decade}/{zip_file.name}'
+                download(zip_file, url)
 
-            dist = {'VTD':f'vtd{decade}', 'CD':f'congress{decade-10}', 'SLDU':f'senate{decade-10}', 'SLDL':f'house{decade-10}'}
-            L = []
-            for abbr, name in dist.items():
-                f = zip_file.parent / f'{zip_file.stem}_{abbr}.txt'
-                df = ut.prep(pd.read_csv(f, sep='|'))
-                if abbr == 'VTD':
-                    # create vtd id using 3 fips + 6 vtd, pad on left with 0 as needed
-                    df['district'] = self.state.fips + ut.rjust(df['countyfp'], 3) + ut.rjust(df['district'], 6)
-                repl = {'blockid': geoid, 'district':name}
-                L.append(df.rename(columns=repl)[repl.values()].set_index(geoid))
-            df = pd.concat(L, axis=1)
-            self.bq.df_to_tbl(df, tbl)
-        print(tbl, end=ellipsis)
+                dist = {'VTD':f'vtd{decade}', 'CD':f'congress{decade-10}', 'SLDU':f'senate{decade-10}', 'SLDL':f'house{decade-10}'}
+                L = []
+                for abbr, name in dist.items():
+                    f = zip_file.parent / f'{zip_file.stem}_{abbr}.txt'
+                    df = ut.prep(pd.read_csv(f, sep='|'))
+                    if abbr == 'VTD':
+                        # create vtd id using 3 fips + 6 vtd, pad on left with 0 as needed
+                        df['district'] = self.state.fips + ut.rjust(df['countyfp'], 3) + ut.rjust(df['district'], 6)
+                    repl = {'blockid': geoid, 'district':name}
+                    L.append(df.rename(columns=repl)[repl.values()].set_index(geoid))
+                df = pd.concat(L, axis=1)
+                self.bq.df_to_tbl(df, tbl)
         return tbl
 
 
-    @codetiming.Timer()
     def get_pl(self, overwrite=False):
         tbl = f'pl.{self.state.abbr}_block2020'
         path, geoid, level, year, decade = self.parse(tbl)
         if not self.bq.get_tbl(tbl, overwrite):
-            repl = {v:k for k,v in subpops.items() if v}
-            df = self.fetch_census(fields=['name', *repl.keys()], dataset='pl', year=year, level='block').rename(columns=repl)
-            compute_other(df, 'tot_pop')
-            compute_other(df, 'vap_pop')
-            df['county2020'] = df['name'].str.split(', ', expand=True)[3].str[:-7]
-            df = df[[geoid, *subpops.keys(), 'county2020']]
-            self.bq.df_to_tbl(df, tbl)
-        print(tbl, end=ellipsis)
+            with Timer():
+                rpt(tbl)
+                repl = {v:k for k,v in subpops.items() if v}
+                df = self.fetch_census(fields=['name', *repl.keys()], dataset='pl', year=year, level='block').rename(columns=repl)
+                compute_other(df, 'tot_pop')
+                compute_other(df, 'vap_pop')
+                df['county2020'] = df['name'].str.split(', ', expand=True)[3].str[:-7]
+                df = df[[geoid, *subpops.keys(), 'county2020']]
+                self.bq.df_to_tbl(df, tbl)
         return tbl
 
 
-    @codetiming.Timer()
     def get_shapes(self, overwrite=False):
         tbl = f'shapes.{self.state.abbr}_block2020'
         path, geoid, level, year, decade = self.parse(tbl)
         if not self.bq.get_tbl(tbl, overwrite):
-            d = decade % 100
-            zip_file = path / f'tl_{decade}_{self.state.fips}_tabblock{d}.zip'
-            if decade == 2010:
-                url = f'https://www2.census.gov/geo/tiger/TIGER{decade}/TABBLOCK/{decade}/{zip_file.name}'
-            elif decade == 2020:
-                url = f'https://www2.census.gov/geo/tiger/TIGER{decade}/TABBLOCK{d}/{zip_file.name}'
-            download(zip_file, url, unzip=False)
+            with Timer():
+                rpt(tbl)
+                d = decade % 100
+                zip_file = path / f'tl_{decade}_{self.state.fips}_tabblock{d}.zip'
+                if decade == 2010:
+                    url = f'https://www2.census.gov/geo/tiger/TIGER{decade}/TABBLOCK/{decade}/{zip_file.name}'
+                elif decade == 2020:
+                    url = f'https://www2.census.gov/geo/tiger/TIGER{decade}/TABBLOCK{d}/{zip_file.name}'
+                download(zip_file, url, unzip=False)
 
-            repl = {f'geoid{d}':geoid, f'aland{d}': 'aland', f'awater{d}': 'awater', 'geometry':'geometry',}
-            df = ut.prep(gpd.read_file(zip_file)).rename(columns=repl)[repl.values()].to_crs(crs['bigquery'])
-            df.geometry = df.geometry.buffer(0).apply(orient, args=(1,))
-            self.bq.df_to_tbl(df, tbl)
-        print(tbl, end=ellipsis)
+                repl = {f'geoid{d}':geoid, f'aland{d}': 'aland', f'awater{d}': 'awater', 'geometry':'geometry',}
+                df = ut.prep(gpd.read_file(zip_file)).rename(columns=repl)[repl.values()].to_crs(crs['bigquery'])
+                df.geometry = df.geometry.buffer(0).apply(orient, args=(1,))
+                self.bq.df_to_tbl(df, tbl)
         return tbl
