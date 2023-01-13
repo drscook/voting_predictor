@@ -45,7 +45,7 @@ def compute_other(df, feat):
         print(f'Can not compute other_{feat}', end=ellipsis)
 
 @dataclasses.dataclass
-class Redistricter():
+class Voting():
     census_api_key: str
     bg_project_id: str
     state: str = 'TX'
