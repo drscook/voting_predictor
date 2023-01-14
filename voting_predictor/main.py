@@ -277,7 +277,7 @@ using (block2010)"""
         if self.state.abbr != 'TX':
             return False
         attr = 'elections'
-        tbl = f'{attr}.state.abbr}_vtd2022'
+        tbl = f'{attr}.state.abbr_vtd2022'
         path, geoid, level, year, decade = self.parse(tbl)
         if not self.bq.get_tbl(tbl, overwrite=attr in self.refresh):
             tbl_raw = tbl + '_raw'
