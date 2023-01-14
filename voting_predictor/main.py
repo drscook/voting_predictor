@@ -6,7 +6,6 @@ from shapely.ops import orient
 warnings.filterwarnings('ignore', message='.*ShapelyDeprecationWarning.*')
 warnings.filterwarnings('ignore', message='.*DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.*')
 warnings.simplefilter(action='ignore', category=FutureWarning)
- 
 
 def get_decade(year):
     return int(year) // 10 * 10
