@@ -281,7 +281,7 @@ using (block2010)"""
         path, geoid, level, year, decade = self.parse(tbl)
         if not self.bq.get_tbl(tbl, overwrite=attr in self.refresh):
             tbl_raw = tbl + '_raw'
-            if not self.bq.get_tbl(tbl_raw, overwrite):
+            if not self.bq.get_tbl(tbl_raw, overwrite=attr in self.refresh):
                 with Timer():
                     rpt(tbl_raw)
                     zip_file = path / f'2020-general-vtd-election-data-2020.zip'
