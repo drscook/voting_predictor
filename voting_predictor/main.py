@@ -60,6 +60,7 @@ class Voting():
         self.bq = ut.BigQuery(project_id=self.bq_project_id)
         self.state = us.states.lookup(self.state)
         self.tbls = dict()
+        self.refresh = set(self.refresh)
 
         
     def fetch_census(self, fields, dataset='acs5', year=2020, level='tract'):
@@ -94,6 +95,7 @@ class Voting():
         tbl = f'{attr}.{self.state.abbr}_vtd2020'
         path, geoid, level, year, decade = self.parse(tbl)
         if not self.bq.get_tbl(tbl, overwrite=attr in self.refresh):
+            self.refresh.discard(attr)
             qry = f"""
 select
     campaign,
@@ -149,6 +151,7 @@ using ({geoid})
         path_src, geoid_src, level_src, year_src, decade_src = self.parse(tbl_src)
         path    , geoid    , level    , year    , decade     = self.parse(tbl)
         if not self.bq.get_tbl(tbl, overwrite=attr in self.refresh):
+            self.refresh.discard(attr)
             qry = f"""
 select
     A.*,
@@ -184,6 +187,7 @@ using ({geoid})"""
         tbl = f'{attr}.{self.state.abbr}_tract{year}'
         path, geoid, level, year, decade = self.parse(tbl)
         if not self.bq.get_tbl(tbl, overwrite=attr in self.refresh):
+            self.refresh.discard(attr)
             with Timer():
                 rpt(tbl)
                 base = set().union(*features.values())
@@ -205,8 +209,8 @@ using ({geoid})"""
         attr = 'transformers'
         tbl = f'{attr}.{self.state.abbr}_{level}{year}'
         path, geoid, level, year, decade = self.parse(tbl)
-
         if not self.bq.get_tbl(tbl, overwrite=attr in self.refresh):
+            self.refresh.discard(attr)
             qry = f"""
 select
     {geoid+',' if year<2020 else ''}
@@ -235,6 +239,7 @@ using ({geoid})"""
         tbl = f'{attr}.{self.state.abbr}_block2020'
         path, geoid, level, year, decade = self.parse(tbl)
         if not self.bq.get_tbl(tbl, overwrite=attr in self.refresh):
+            self.refresh.discard(attr)
             tbl_raw = tbl+'_raw'
             if not self.bq.get_tbl(tbl_raw, overwrite):
                 with Timer():
@@ -280,6 +285,7 @@ using (block2010)"""
         tbl = f'{attr}.{self.state.abbr}_vtd2022'
         path, geoid, level, year, decade = self.parse(tbl)
         if not self.bq.get_tbl(tbl, overwrite=attr in self.refresh):
+            self.refresh.discard(attr)
             tbl_raw = tbl + '_raw'
             if not self.bq.get_tbl(tbl_raw, overwrite=attr in self.refresh):
                 with Timer():
@@ -332,6 +338,7 @@ group by 1,2,3,4,5,6,7,8,9"""
         tbl = f'{attr}.{self.state.abbr}_{level}2020'
         path, geoid, level, year, decade = self.parse(tbl)
         if not self.bq.get_tbl(tbl, overwrite=attr in self.refresh):
+            self.refresh.discard(attr)
             if level == 'block':
                 qry = f"""
 select * except (geometry), geometry,
@@ -413,6 +420,7 @@ using ({geoid})"""
         tbl = f'{attr}.{self.state.abbr}_block2020'
         path, geoid, level, year, decade = self.parse(tbl)
         if not self.bq.get_tbl(tbl, overwrite=attr in self.refresh):
+            self.refresh.discard(attr)
             with Timer():
                 rpt(tbl)
                 district_types = {'s':31, 'h':150, 'c':38}
@@ -453,6 +461,7 @@ using ({geoid})"""
         tbl = f'{attr}.{self.state.abbr}_block{year}'
         path, geoid, level, year, decade = self.parse(tbl)
         if not self.bq.get_tbl(tbl, overwrite=attr in self.refresh):
+            self.refresh.discard(attr)
             with Timer():
                 rpt(tbl)
                 zip_file = path / f'BlockAssign_ST{self.state.fips}_{self.state.abbr}.zip'
@@ -482,6 +491,7 @@ using ({geoid})"""
         tbl = f'{attr}.{self.state.abbr}_block2020'
         path, geoid, level, year, decade = self.parse(tbl)
         if not self.bq.get_tbl(tbl, overwrite=attr in self.refresh):
+            self.refresh.discard(attr)
             with Timer():
                 rpt(tbl)
                 repl = {v:k for k,v in subpops.items() if v}
@@ -499,6 +509,7 @@ using ({geoid})"""
         tbl = f'{attr}.{self.state.abbr}_block2020'
         path, geoid, level, year, decade = self.parse(tbl)
         if not self.bq.get_tbl(tbl, overwrite=attr in self.refresh):
+            self.refresh.discard(attr)
             with Timer():
                 rpt(tbl)
                 d = decade % 100
