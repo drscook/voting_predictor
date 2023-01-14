@@ -47,7 +47,7 @@ def compute_other(df, feat):
 @dataclasses.dataclass
 class Voting():
     census_api_key: str
-    bg_project_id: str
+    bq_project_id: str
     state: str = 'TX'
     root_path:str = '/content/'
     
@@ -56,7 +56,7 @@ class Voting():
         self.data_path = self.root_path / 'data'
         self.data_path.mkdir(parents=True, exist_ok=True)
         self.census_session = census.Census(self.census_api_key)
-        self.bq = ut.BigQuery(project_id=self.bg_project_id)
+        self.bq = ut.BigQuery(project_id=self.bq_project_id)
         self.state = us.states.lookup(self.state)
         self.tbls = dict()
 
