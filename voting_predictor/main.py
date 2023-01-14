@@ -95,7 +95,6 @@ class Voting():
         tbl = f'{attr}.{self.state.abbr}_vtd2020'
         path, geoid, level, year, decade = self.parse(tbl)
         if not self.bq.get_tbl(tbl, overwrite=attr in self.refresh):
-            self.refresh.discard(attr)
             qry = f"""
 select
     campaign,
@@ -141,6 +140,7 @@ using ({geoid})
             with Timer():
                 rpt(tbl)
                 self.bq.qry_to_tbl(qry, tbl)
+                self.refresh.discard(attr)
         return tbl
 
 
@@ -151,7 +151,6 @@ using ({geoid})
         path_src, geoid_src, level_src, year_src, decade_src = self.parse(tbl_src)
         path    , geoid    , level    , year    , decade     = self.parse(tbl)
         if not self.bq.get_tbl(tbl, overwrite=attr in self.refresh):
-            self.refresh.discard(attr)
             qry = f"""
 select
     A.*,
@@ -179,6 +178,7 @@ using ({geoid})"""
             with Timer():
                 rpt(tbl)
                 self.bq.qry_to_tbl(qry, tbl)
+                self.refresh.discard(attr)
         return tbl
 
 
@@ -187,7 +187,6 @@ using ({geoid})"""
         tbl = f'{attr}.{self.state.abbr}_tract{year}'
         path, geoid, level, year, decade = self.parse(tbl)
         if not self.bq.get_tbl(tbl, overwrite=attr in self.refresh):
-            self.refresh.discard(attr)
             with Timer():
                 rpt(tbl)
                 base = set().union(*features.values())
@@ -202,6 +201,7 @@ using ({geoid})"""
                 for var in {name[name.find('_')+1:] for name in features.keys()}:
                     compute_other(df, var)
                 self.bq.df_to_tbl(df, tbl)
+                self.refresh.discard(attr)
         return tbl
 
 
@@ -210,7 +210,6 @@ using ({geoid})"""
         tbl = f'{attr}.{self.state.abbr}_{level}{year}'
         path, geoid, level, year, decade = self.parse(tbl)
         if not self.bq.get_tbl(tbl, overwrite=attr in self.refresh):
-            self.refresh.discard(attr)
             qry = f"""
 select
     {geoid+',' if year<2020 else ''}
@@ -231,6 +230,7 @@ using ({geoid})"""
             with Timer():
                 rpt(tbl)
                 self.bq.qry_to_tbl(qry, tbl)
+                self.refresh.discard(attr)
         return tbl
 
 
@@ -239,7 +239,6 @@ using ({geoid})"""
         tbl = f'{attr}.{self.state.abbr}_block2020'
         path, geoid, level, year, decade = self.parse(tbl)
         if not self.bq.get_tbl(tbl, overwrite=attr in self.refresh):
-            self.refresh.discard(attr)
             tbl_raw = tbl+'_raw'
             if not self.bq.get_tbl(tbl_raw):
                 with Timer():
@@ -275,6 +274,7 @@ using (block2010)"""
             with Timer():
                 rpt(tbl)
                 self.bq.qry_to_tbl(qry, tbl)
+                self.refresh.discard(attr)
         return tbl
 
 
@@ -285,7 +285,6 @@ using (block2010)"""
         tbl = f'{attr}.{self.state.abbr}_vtd2022'
         path, geoid, level, year, decade = self.parse(tbl)
         if not self.bq.get_tbl(tbl, overwrite=attr in self.refresh):
-            self.refresh.discard(attr)
             tbl_raw = tbl + '_raw'
             if not self.bq.get_tbl(tbl_raw, overwrite=attr in self.refresh):
                 with Timer():
@@ -330,6 +329,7 @@ group by 1,2,3,4,5,6,7,8,9"""
             with Timer():
                 rpt(tbl)
                 self.bq.qry_to_tbl(qry, tbl)
+                self.refresh.discard(attr)
         return tbl
 
 
@@ -338,7 +338,6 @@ group by 1,2,3,4,5,6,7,8,9"""
         tbl = f'{attr}.{self.state.abbr}_{level}2020'
         path, geoid, level, year, decade = self.parse(tbl)
         if not self.bq.get_tbl(tbl, overwrite=attr in self.refresh):
-            self.refresh.discard(attr)
             if level == 'block':
                 qry = f"""
 select * except (geometry), geometry,
@@ -353,7 +352,7 @@ from (
             st_area(geometry) as atot,
             st_perimeter(geometry) as perim,
             geometry,
-        from {self.get_shapes()} )
+        from {self.get_shapes()})
     ) as S
 join {self.get_pl()} as P
 using ({geoid})
@@ -363,7 +362,6 @@ using ({geoid})"""
                     qry += f"""
 join {self.get_plans()} as B
 using ({geoid})"""
-
 
             else:
                 tbl_raw = self.get_geo(level='block')
@@ -410,6 +408,7 @@ using ({geoid})"""
             with Timer():
                 rpt(tbl)
                 self.bq.qry_to_tbl(qry, tbl)
+                self.refresh.discard(attr)
         return tbl
 
 
@@ -420,7 +419,6 @@ using ({geoid})"""
         tbl = f'{attr}.{self.state.abbr}_block2020'
         path, geoid, level, year, decade = self.parse(tbl)
         if not self.bq.get_tbl(tbl, overwrite=attr in self.refresh):
-            self.refresh.discard(attr)
             with Timer():
                 rpt(tbl)
                 district_types = {'s':31, 'h':150, 'c':38}
@@ -453,6 +451,7 @@ using ({geoid})"""
                             L.append(df)
                 df = ut.prep(pd.concat(L, axis=1))
                 self.bq.df_to_tbl(df, tbl)
+                self.refresh.discard(attr)
         return tbl
 
 
@@ -461,7 +460,6 @@ using ({geoid})"""
         tbl = f'{attr}.{self.state.abbr}_block{year}'
         path, geoid, level, year, decade = self.parse(tbl)
         if not self.bq.get_tbl(tbl, overwrite=attr in self.refresh):
-            self.refresh.discard(attr)
             with Timer():
                 rpt(tbl)
                 zip_file = path / f'BlockAssign_ST{self.state.fips}_{self.state.abbr}.zip'
@@ -483,6 +481,7 @@ using ({geoid})"""
                     L.append(df.rename(columns=repl)[repl.values()].set_index(geoid))
                 df = pd.concat(L, axis=1)
                 self.bq.df_to_tbl(df, tbl)
+                self.refresh.discard(attr)
         return tbl
 
 
@@ -491,7 +490,6 @@ using ({geoid})"""
         tbl = f'{attr}.{self.state.abbr}_block2020'
         path, geoid, level, year, decade = self.parse(tbl)
         if not self.bq.get_tbl(tbl, overwrite=attr in self.refresh):
-            self.refresh.discard(attr)
             with Timer():
                 rpt(tbl)
                 repl = {v:k for k,v in subpops.items() if v}
@@ -501,6 +499,7 @@ using ({geoid})"""
                 df['county2020'] = df['name'].str.split(', ', expand=True)[3].str[:-7]
                 df = df[[geoid, *subpops.keys(), 'county2020']]
                 self.bq.df_to_tbl(df, tbl)
+                self.refresh.discard(attr)
         return tbl
 
 
@@ -509,7 +508,6 @@ using ({geoid})"""
         tbl = f'{attr}.{self.state.abbr}_block2020'
         path, geoid, level, year, decade = self.parse(tbl)
         if not self.bq.get_tbl(tbl, overwrite=attr in self.refresh):
-            self.refresh.discard(attr)
             with Timer():
                 rpt(tbl)
                 d = decade % 100
@@ -524,4 +522,5 @@ using ({geoid})"""
                 df = ut.prep(gpd.read_file(zip_file)).rename(columns=repl)[repl.values()].to_crs(crs['bigquery'])
                 df.geometry = df.geometry.buffer(0).apply(orient, args=(1,))
                 self.bq.df_to_tbl(df, tbl)
+                self.refresh.discard(attr)
         return tbl
