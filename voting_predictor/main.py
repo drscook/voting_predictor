@@ -241,7 +241,7 @@ using ({geoid})"""
         if not self.bq.get_tbl(tbl, overwrite=attr in self.refresh):
             self.refresh.discard(attr)
             tbl_raw = tbl+'_raw'
-            if not self.bq.get_tbl(tbl_raw, overwrite):
+            if not self.bq.get_tbl(tbl_raw):
                 with Timer():
                     rpt(tbl_raw)
                     zip_file = path / f'TAB2010_TAB2020_ST{self.state.fips}.zip'
