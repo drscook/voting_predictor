@@ -239,7 +239,7 @@ from (
         T.{geoid},
         {ut.make_select([f'sum(A.{x} * T.{x[:x.rfind("_")]}_pop) as {x}' for x in features.keys()], 2)},
     from {tbl_src} as A
-    inner join {self.get_transformer(year=year_src, level=level_src)} as T
+    inner join {self.get_transformer(year=year_src)} as T
     using ({geoid_src})
     group by 1, 2
 ) as A
