@@ -48,6 +48,7 @@ class Voting():
     census_api_key: str
     bq_project_id: str
     state: str = 'TX'
+    level: str = 'vtd'
     root_path:str = '/content/'
     refresh: tuple = () 
     
@@ -59,10 +60,12 @@ class Voting():
         self.bq = ut.BigQuery(project_id=self.bq_project_id)
         self.state = us.states.lookup(self.state)
         self.tbls = dict()
-        dependencies = {'shapes': 'geo', 'pl':'geo', 'plans':'geo', 'assignments': ['geo', 'crosswalks'],
-                        'geo': ['crosswalks', 'acs5_transformed', 'elections'], 'crosswalks': 'transformer',
-                        'transformer':'acs5_transformed', 'acs5': 'acs5_transformed',
-                        'acs5_transformed':'final', 'elections':'final', 'final':set()}
+        dependencies = {
+            'shapes':'geo_raw', 'pl':'geo_raw', 'plans':'geo_raw', 'assignments':['geo_raw', 'crosswalks'],
+            'geo_raw':['geo', 'crosswalks'], 'geo': ['acs5_transformed', 'elections'],
+            'crosswalks_raw':'crosswalks', 'crosswalks': 'transformer', 'transformer':'acs5_transformed',
+            'acs5': 'acs5_transformed','acs5_transformed':'final',
+            'elections_raw': 'elections', 'elections':'final', 'final':set()}
         self.refresh = ut.setify(self.refresh)
         l = 0
         while l < len(self.refresh):
@@ -100,7 +103,7 @@ class Voting():
 
     def get_final(self, extra_cols=None):
         attr = 'final'
-        if self.state.abbr != 'TX':
+        if (self.state.abbr != 'TX') or (self.level != 'vtd'):
             return False
         tbl = f'{attr}.{self.state.abbr}_vtd2020'
         path, geoid, level, year, decade = self.parse(tbl)
@@ -152,12 +155,68 @@ using ({geoid})
                 self.bq.qry_to_tbl(qry, tbl)
                 self.refresh.discard(attr)
         return tbl
+    
+    
+    def get_elections(self):
+        if (self.state.abbr != 'TX') or (self.level != 'vtd'):
+            return False
+        attr = 'elections'
+        tbl = f'{attr}.{self.state.abbr}_vtd2022'
+        path, geoid, level, year, decade = self.parse(tbl)
+        if not self.bq.get_tbl(tbl, overwrite=attr in self.refresh):
+            attr_raw = attr+'_raw'
+            tbl_raw  = tbl+'_raw'
+            if not self.bq.get_tbl(tbl_raw, overwrite=attr_raw in self.refresh):
+                with Timer():
+                    rpt(tbl_raw)
+                    zip_file = path / f'2020-general-vtd-election-data-2020.zip'
+                    url = f'https://data.capitol.texas.gov/dataset/35b16aee-0bb0-4866-b1ec-859f1f044241/resource/5af9f5e2-ca14-4e5d-880e-3c3cd891d3ed/download/{zip_file.name}'
+                    download(zip_file, url)
+
+                    L = []
+                    cols = ['vtd2020', 'county2020', 'fips', 'office', 'year', 'election', 'name', 'party', 'incumbent', 'votes']                    
+                    for file in path.iterdir():
+                        a = ut.prep(file.stem.split('_'))
+                        if a[-1] == 'returns':
+                            df = ut.prep(pd.read_csv(file)).rename(columns={'vtd':'vtd2020', 'county':'county2020'})
+                            mask = (df['votes'] > 0) & (df['party'].isin(('R', 'D', 'L', 'G')))
+                            if mask.any():
+                                repl = {(' ', '.', ','): ''}
+                                df['vtd2020'] = ut.rjust(df['vtd2020'], 6)
+                                df['fips'] = self.state.fips + ut.rjust(df['fips'], 3)
+                                df['office'] = ut.replace(df['office'], repl)
+                                df['year'] = int(a[0])
+                                df['election'] = ut.join(a[1:-2], '_')
+                                df['name'] = ut.replace(df['name'], repl)
+                                df['incumbent'] = df['incumbent'] == 'Y'
+                                L.append(df.loc[mask, cols])
+                    df = ut.prep(pd.concat(L, axis=0)).reset_index(drop=True)
+                    self.bq.df_to_tbl(df[cols], tbl_raw)
+                    self.refresh.discard(attr_raw)
+            qry = f"""
+select
+    coalesce(B.vtd2020, C.vtd2020) as vtd2020,
+    A.* except (vtd2020, votes),
+    sum(A.votes) as votes,
+    sum(coalesce(B.all_tot_pop, C.all_tot_pop)) as all_tot_pop,
+from {tbl_raw} as A
+left join {self.get_geo(level='vtd')} as B
+on A.fips || A.vtd2020 = B.vtd2020
+left join {self.get_geo('vtd')} as C
+on A.fips || '0' || left(A.vtd2020, 5) = C.vtd2020
+group by 1,2,3,4,5,6,7,8,9"""
+            # print(qry)
+            with Timer():
+                rpt(tbl)
+                self.bq.qry_to_tbl(qry, tbl)
+                self.refresh.discard(attr)
+        return tbl
 
 
-    def get_acs5_transformed(self, year=2018, level='vtd', extra_cols=None, overwrite=False):
+    def get_acs5_transformed(self, year=2018, extra_cols=None, overwrite=False):
         attr = 'acs5_transformed'
         tbl_src  = self.get_acs5(year=year)
-        tbl = f'{tbl_src}_{level}2020'
+        tbl = f'{tbl_src}_{self.level}2020'
         path_src, geoid_src, level_src, year_src, decade_src = self.parse(tbl_src)
         path    , geoid    , level    , year    , decade     = self.parse(tbl)
         if not self.bq.get_tbl(tbl, overwrite=attr in self.refresh):
@@ -215,9 +274,9 @@ using ({geoid})"""
         return tbl
 
 
-    def get_transformer(self, year=2018, level='tract'):
+    def get_transformer(self, year=2018):
         attr = 'transformers'
-        tbl = f'{attr}.{self.state.abbr}_{level}{year}'
+        tbl = f'{attr}.{self.state.abbr}_{self.level}{year}'
         path, geoid, level, year, decade = self.parse(tbl)
         if not self.bq.get_tbl(tbl, overwrite=attr in self.refresh):
             qry = f"""
@@ -249,8 +308,9 @@ using ({geoid})"""
         tbl = f'{attr}.{self.state.abbr}_block2020'
         path, geoid, level, year, decade = self.parse(tbl)
         if not self.bq.get_tbl(tbl, overwrite=attr in self.refresh):
-            tbl_raw = tbl+'_raw'
-            if not self.bq.get_tbl(tbl_raw):
+            attr_raw = attr+'_raw'
+            tbl_raw  = tbl+'_raw'
+            if not self.bq.get_tbl(tbl_raw, overwrite=attr_raw in self.refresh):
                 with Timer():
                     rpt(tbl_raw)
                     zip_file = path / f'TAB2010_TAB2020_ST{self.state.fips}.zip'
@@ -264,6 +324,7 @@ using ({geoid})"""
                         df[f'aprop{dec}'] = df['aland'] / np.fmax(df.groupby(geoid)['aland'].transform('sum'), 1)
                     df = ut.prep(df[['block2010', 'block2020', 'aland', 'aprop2010', 'aprop2020']])
                     self.bq.df_to_tbl(df, tbl_raw)
+                    self.refresh.discard(attr_raw)
             qry = f"""
 select
     C.*,
@@ -276,7 +337,7 @@ select
     G.county2020,
     {ut.make_select([f'C.aprop2020 * G.{subpop} as {subpop}' for subpop in subpops.keys()])}
 from {tbl_raw} as C
-left join {self.get_geo()} as G
+left join {self.get_geo(level='block')} as G
 using (block2020)
 left join {self.get_assignments(year=2010)} as A
 using (block2010)"""
@@ -288,68 +349,15 @@ using (block2010)"""
         return tbl
 
 
-    def get_elections(self):
-        if self.state.abbr != 'TX':
-            return False
-        attr = 'elections'
-        tbl = f'{attr}.{self.state.abbr}_vtd2022'
-        path, geoid, level, year, decade = self.parse(tbl)
-        if not self.bq.get_tbl(tbl, overwrite=attr in self.refresh):
-            tbl_raw = tbl + '_raw'
-            if not self.bq.get_tbl(tbl_raw, overwrite=attr in self.refresh):
-                with Timer():
-                    rpt(tbl_raw)
-                    zip_file = path / f'2020-general-vtd-election-data-2020.zip'
-                    url = f'https://data.capitol.texas.gov/dataset/35b16aee-0bb0-4866-b1ec-859f1f044241/resource/5af9f5e2-ca14-4e5d-880e-3c3cd891d3ed/download/{zip_file.name}'
-                    download(zip_file, url)
-
-                    L = []
-                    cols = ['vtd2020', 'county2020', 'fips', 'office', 'year', 'election', 'name', 'party', 'incumbent', 'votes']                    
-                    for file in path.iterdir():
-                        a = ut.prep(file.stem.split('_'))
-                        if a[-1] == 'returns':
-                            df = ut.prep(pd.read_csv(file)).rename(columns={'vtd':'vtd2020', 'county':'county2020'})
-                            mask = (df['votes'] > 0) & (df['party'].isin(('R', 'D', 'L', 'G')))
-                            if mask.any():
-                                repl = {(' ', '.', ','): ''}
-                                df['vtd2020'] = ut.rjust(df['vtd2020'], 6)
-                                df['fips'] = self.state.fips + ut.rjust(df['fips'], 3)
-                                df['office'] = ut.replace(df['office'], repl)
-                                df['year'] = int(a[0])
-                                df['election'] = ut.join(a[1:-2], '_')
-                                df['name'] = ut.replace(df['name'], repl)
-                                df['incumbent'] = df['incumbent'] == 'Y'
-                                L.append(df.loc[mask, cols])
-                    df = ut.prep(pd.concat(L, axis=0)).reset_index(drop=True)
-                    self.bq.df_to_tbl(df[cols], tbl_raw)
-
-            qry = f"""
-select
-    coalesce(B.vtd2020, C.vtd2020) as vtd2020,
-    A.* except (vtd2020, votes),
-    sum(A.votes) as votes,
-    sum(coalesce(B.all_tot_pop, C.all_tot_pop)) as all_tot_pop,
-from {tbl_raw} as A
-left join {self.get_geo('vtd')} as B
-on A.fips || A.vtd2020 = B.vtd2020
-left join {self.get_geo('vtd')} as C
-on A.fips || '0' || left(A.vtd2020, 5) = C.vtd2020
-group by 1,2,3,4,5,6,7,8,9"""
-            # print(qry)
-            with Timer():
-                rpt(tbl)
-                self.bq.qry_to_tbl(qry, tbl)
-                self.refresh.discard(attr)
-        return tbl
-
-
-    def get_geo(self, level='block'):
+    def get_geo(self):
         attr = 'geo'
-        tbl = f'{attr}.{self.state.abbr}_{level}2020'
+        tbl = f'{attr}.{self.state.abbr}_{self.level}2020'
         path, geoid, level, year, decade = self.parse(tbl)
         if not self.bq.get_tbl(tbl, overwrite=attr in self.refresh):
-            if level == 'block':
-                qry = f"""
+            attr_raw = attr+'_raw'
+            tbl_raw  = tbl.replace(self.level, 'block')
+            if not self.bq.get_tbl(tbl_raw, overwrite=attr_raw in self.refresh):
+                qry_raw = f"""
 select * except (geometry), geometry,
 from (
     select *, case when perim < 0.1 then 0 else 4 * {np.pi} * atot / (perim * perim) end as polsby_popper,
@@ -369,17 +377,19 @@ using ({geoid})
 join {self.get_assignments()} as A
 using ({geoid})"""
                 if self.state.abbr == 'TX':
-                    qry += f"""
+                    qry_raw += f"""
 join {self.get_plans()} as B
 using ({geoid})"""
+                with Timer():
+                    rpt(tbl_raw)
+                    self.bq.qry_to_tbl(qry_raw, tbl_raw)
+                    self.refresh.discard(attr_raw)
 
-            else:
-                tbl_raw = self.get_geo(level='block')
-                geo_cols = [geoid, 'dist_to_border', 'aland', 'awater', 'atot', 'perim', 'polsby_popper', 'geometry']
-                pop_cols = ['all_tot_pop', 'all_vap_pop', 'white_tot_pop', 'white_vap_pop', 'hisp_tot_pop', 'hisp_vap_pop', 'other_tot_pop', 'other_vap_pop']
-                exclude_cols = ['block2020']
-                district_cols = [x for x in self.bq.get_cols(tbl_raw) if x not in geo_cols + pop_cols + exclude_cols]
-                qry = f"""
+            geo_cols = [geoid, 'dist_to_border', 'aland', 'awater', 'atot', 'perim', 'polsby_popper', 'geometry']
+            pop_cols = ['all_tot_pop', 'all_vap_pop', 'white_tot_pop', 'white_vap_pop', 'hisp_tot_pop', 'hisp_vap_pop', 'other_tot_pop', 'other_vap_pop']
+            exclude_cols = ['block2020']
+            district_cols = [x for x in self.bq.get_cols(tbl_raw) if x not in geo_cols + pop_cols + exclude_cols]
+            qry = f"""
 select * except (geometry), geometry,
 from (
     select *, case when perim < 0.1 then 0 else 4 * {np.pi} * atot / (perim * perim) end as polsby_popper,
