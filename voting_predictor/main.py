@@ -60,9 +60,9 @@ class Voting():
         self.state = us.states.lookup(self.state)
         self.tbls = dict()
         dependencies = {'shapes': 'geo', 'pl':'geo', 'plans':'geo', 'assignments': ['geo', 'crosswalks'],
-                        'geo': ['crosswalks', 'acs5_transformed', 'elections'],
-                        'crosswalks': 'transformer', 'transformer':'acs5_transformed',
-                        'acs5': 'acs5_transformed', 'acs5_transformed':'final', 'elections':'final'}
+                        'geo': ['crosswalks', 'acs5_transformed', 'elections'], 'crosswalks': 'transformer',
+                        'transformer':'acs5_transformed', 'acs5': 'acs5_transformed',
+                        'acs5_transformed':'final', 'elections':'final', 'final':set()}
         self.refresh = ut.setify(self.refresh)
         l = 0
         while l < len(self.refresh):
