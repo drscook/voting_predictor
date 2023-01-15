@@ -199,9 +199,9 @@ select
     sum(A.votes) as votes,
     sum(coalesce(B.all_tot_pop, C.all_tot_pop)) as all_tot_pop,
 from {tbl_raw} as A
-left join {self.get_geo(level='vtd')} as B
+left join {self.get_geo()} as B
 on A.fips || A.vtd2020 = B.vtd2020
-left join {self.get_geo('vtd')} as C
+left join {self.get_geo()} as C
 on A.fips || '0' || left(A.vtd2020, 5) = C.vtd2020
 group by 1,2,3,4,5,6,7,8,9"""
             # print(qry)
@@ -240,7 +240,7 @@ from (
     using ({geoid_src})
     group by 1, 2
 ) as A
-join {self.get_geo(level=level)} as G
+join {self.get_geo()} as G
 using ({geoid})"""
             # print(qry)
             with Timer():
@@ -336,7 +336,7 @@ select
     G.county2020,
     {ut.make_select([f'C.aprop2020 * G.{subpop} as {subpop}' for subpop in subpops.keys()])}
 from {tbl_raw} as C
-left join {self.get_geo(level='block')} as G
+left join {self.get_geo(block=True)} as G
 using (block2020)
 left join {self.get_assignments(year=2010)} as A
 using (block2010)"""
@@ -348,15 +348,18 @@ using (block2010)"""
         return tbl
 
 
-    def get_geo(self):
-        attr = 'geo'
-        tbl = f'{attr}.{self.state.abbr}_{self.level}2020'
+    def get_geo(self, block=False):
+        r = f'geo.{self.state.abbr}_'
+        if block:
+            attr = 'geo_raw'
+            tbl = r+'block2020'
+        else:
+            attr = 'geo'
+            tbl = r+self.level+'2020'
         path, geoid, level, year, decade = self.parse(tbl)
         if not self.bq.get_tbl(tbl, overwrite=attr in self.refresh):
-            attr_raw = attr+'_raw'
-            tbl_raw  = tbl.replace(self.level, 'block')
-            if not self.bq.get_tbl(tbl_raw, overwrite=attr_raw in self.refresh):
-                qry_raw = f"""
+            if block:
+                qry = f"""
 select * except (geometry), geometry,
 from (
     select *, case when perim < 0.1 then 0 else 4 * {np.pi} * atot / (perim * perim) end as polsby_popper,
@@ -376,19 +379,17 @@ using ({geoid})
 join {self.get_assignments()} as A
 using ({geoid})"""
                 if self.state.abbr == 'TX':
-                    qry_raw += f"""
+                    qry += f"""
 join {self.get_plans()} as B
 using ({geoid})"""
-                with Timer():
-                    rpt(tbl_raw)
-                    self.bq.qry_to_tbl(qry_raw, tbl_raw)
-                    self.refresh.discard(attr_raw)
 
-            geo_cols = [geoid, 'dist_to_border', 'aland', 'awater', 'atot', 'perim', 'polsby_popper', 'geometry']
-            pop_cols = ['all_tot_pop', 'all_vap_pop', 'white_tot_pop', 'white_vap_pop', 'hisp_tot_pop', 'hisp_vap_pop', 'other_tot_pop', 'other_vap_pop']
-            exclude_cols = ['block2020']
-            district_cols = [x for x in self.bq.get_cols(tbl_raw) if x not in geo_cols + pop_cols + exclude_cols]
-            qry = f"""
+            else:
+                tbl_raw = self.get_geo(block=True)
+                geo_cols = [geoid, 'dist_to_border', 'aland', 'awater', 'atot', 'perim', 'polsby_popper', 'geometry']
+                pop_cols = ['all_tot_pop', 'all_vap_pop', 'white_tot_pop', 'white_vap_pop', 'hisp_tot_pop', 'hisp_vap_pop', 'other_tot_pop', 'other_vap_pop']
+                exclude_cols = ['block2020']
+                district_cols = [x for x in self.bq.get_cols(tbl_raw) if x not in geo_cols + pop_cols + exclude_cols]
+                qry = f"""
 select * except (geometry), geometry,
 from (
     select *, case when perim < 0.1 then 0 else 4 * {np.pi} * atot / (perim * perim) end as polsby_popper,
