@@ -60,7 +60,6 @@ class Voting():
         self.state = us.states.lookup(self.state)
         self.tbls = dict()
         self.refresh = set(self.refresh)
-        print('hi')
 
         
     def fetch_census(self, fields, dataset='acs5', year=2020, level='tract'):
