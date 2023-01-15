@@ -137,7 +137,7 @@ select
     "{candidates}" as candidates,
     coalesce(B.D, 0) as dem_votes,
     coalesce(B.R, 0) as rep_votes,
-from {self.get_acs5_transformed(year=year, level="vtd", extra_cols=extra_cols)} as A
+from {self.get_acs5_transformed(year=year, extra_cols=extra_cols)} as A
 left join (
     select {geoid}, party, votes,
     from {self.get_elections()}
