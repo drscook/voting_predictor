@@ -59,7 +59,17 @@ class Voting():
         self.bq = ut.BigQuery(project_id=self.bq_project_id)
         self.state = us.states.lookup(self.state)
         self.tbls = dict()
-        self.refresh = set(self.refresh)
+        dependencies = {'shapes': 'geo', 'pl':'geo', 'plans':'geo', 'assignments': ['geo', 'crosswalks'],
+                        'geo', ['crosswalks', 'acs5_transformed', 'elections'], 'crosswalks': 'transformer',
+                        'acs5': 'acs5_transformed', 'acs5_transformed':'final', 'elections':'final'}
+        self.refresh = ut.setify(self.refresh)
+        l = 0
+        while l < len(self.refresh)
+            l = len(self.refresh)
+            for attr in self.refresh.copy():
+                self.refresh.add(attr)
+                self.refresh.update(ut.setify(dependencies[attr]))
+        print(self.refresh)
 
         
     def fetch_census(self, fields, dataset='acs5', year=2020, level='tract'):
