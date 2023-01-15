@@ -72,7 +72,10 @@ class Voting():
             l = len(self.refresh)
             for attr in self.refresh.copy():
                 self.refresh.add(attr)
-                self.refresh.update(ut.setify(dependencies[attr]))
+                try:
+                    self.refresh.update(ut.setify(dependencies[attr]))
+                except KeyError:
+                    print(f'ignoring unknown attribute {attr} ... must be {list(dependencies.keys())}')
 
         
     def fetch_census(self, fields, dataset='acs5', year=2020, level='tract'):
