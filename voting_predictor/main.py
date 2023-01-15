@@ -64,7 +64,7 @@ class Voting():
                         'acs5': 'acs5_transformed', 'acs5_transformed':'final', 'elections':'final'}
         self.refresh = ut.setify(self.refresh)
         l = 0
-        while l < len(self.refresh)
+        while l < len(self.refresh):
             l = len(self.refresh)
             for attr in self.refresh.copy():
                 self.refresh.add(attr)
