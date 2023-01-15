@@ -73,7 +73,6 @@ class Voting():
             for attr in self.refresh.copy():
                 self.refresh.add(attr)
                 self.refresh.update(ut.setify(dependencies[attr]))
-        print(self.refresh)
 
         
     def fetch_census(self, fields, dataset='acs5', year=2020, level='tract'):
