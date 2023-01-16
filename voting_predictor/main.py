@@ -275,8 +275,8 @@ using ({geoid})"""
             qry = f"""
 select
     *,
-    {ut.make_select([f'case when {den(x)} = 0 then 0 else {x} / {den(x)} end as {x.replace('pop','prop')} for x in feat])},
-    {ut.make_select([f'case when aland = 0 then 0 else {x} / aland end as {x.replace('pop','dens')} for x in subpops.keys()])},
+    {ut.make_select([f'case when {den(x)} = 0 then 0 else {x} / {den(x)} end as '+x.replace('pop','prop') for x in feat])},
+    {ut.make_select([f'case when aland = 0 then 0 else {x} / aland end as '+x.replace('pop','dens') for x in subpops.keys()])},
 from (
     {ut.subquery(qry)}
 )"""
