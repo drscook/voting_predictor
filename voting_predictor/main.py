@@ -288,7 +288,7 @@ select
 from (
     {ut.subquery(qry)}
 )"""
-#             print(qry)
+            print(qry)
             with Timer():
                 rpt(tbl)
                 self.bq.qry_to_tbl(qry, tbl)
