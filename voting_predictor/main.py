@@ -255,7 +255,6 @@ using ({geoid})"""
     def get_acs5(self, year=2018):
         attr = 'acs5'
         tbl = f'{attr}.{self.state.abbr}_tract{year}'
-        path, geoid, level, year, decade = self.parse(tbl)
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
             path, geoid, level, year, decade = self.parse(tbl)
             with Timer():
