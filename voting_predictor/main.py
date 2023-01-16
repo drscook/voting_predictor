@@ -234,7 +234,7 @@ select
     G.atot,
     G.perim,
     G.polsby_popper,
-    {ut.make_select([f'white_{x} + hisp_{x} + other_{x} as all_{x}' for x in features_universal])},
+    {ut.make_select([f'A.white_{x} + A.hisp_{x} + A.other_{x} as all_{x}' for x in features_universal])},
     {ut.make_select(feat)},
     {ut.make_select(extra_cols)}
 from (
