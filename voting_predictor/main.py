@@ -252,7 +252,9 @@ join {self.get_geo()} as G
 using ({geoid})"""
             
             def den(x):
-                if x in subpops.keys():
+                if x == 'hisp_vap_spanishathomeenglishwell':
+                    return 'hisp_vap_spanishathome'
+                elif x in subpops.keys():
                     return 'all'+x[ut.findn(x, '_', 1):]
                 else:
                     return x[:ut.findn(x, '_', 2)+1]+'pop'
@@ -261,6 +263,7 @@ using ({geoid})"""
 select
     *,
     {ut.make_select([f'case when {den(x)} = 0 then 0 else {x} / {den(x)} end as {x}_prop' for x in feat])},
+    {ut.make_select([f'case when aland = 0 then 0 else {x} / aland end as {x}_dens' for x in subpops.keys()])},
 from (
     {ut.subquery(qry)}
 )"""
