@@ -261,7 +261,7 @@ using ({geoid})"""
 select
     *,
     {ut.make_select([f'case when den({x}) = 0 then 0 else {x} / den({x}) end as {x}_prop' for x in feat])},
-from
+from (
     {ut.subquery(qry)}
 )"""
             
