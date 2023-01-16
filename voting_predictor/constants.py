@@ -14,10 +14,10 @@ crs = {
 subpops = {
     'all_tot_pop'  : 'p2_001n',
     'all_vap_pop'  : 'p4_001n',
-    'white_tot_pop': 'p2_005n',
-    'white_vap_pop': 'p4_005n',
     'hisp_tot_pop' : 'p2_002n',
     'hisp_vap_pop' : 'p4_002n',
+    'white_tot_pop': 'p2_005n',
+    'white_vap_pop': 'p4_005n',
     'other_tot_pop': None,
     'other_vap_pop': None,
 }
