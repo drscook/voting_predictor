@@ -271,7 +271,7 @@ from (
             qry = f"""
 select
     *,
-    {ut.make_select([f'{x} / max({x}) over () as {x}_rel' for x in ['dist_to_border', *[x+'_dens' for x in subpops.keys()]])},
+    {ut.make_select([f'{x} / max({x}) over () as {x}_rel' for x in ['dist_to_border', *[x+'_dens' for x in subpops.keys()]]])},
 from (
     {ut.subquery(qry)}
 )"""
