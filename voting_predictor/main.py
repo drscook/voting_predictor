@@ -104,7 +104,7 @@ class Voting():
         return path, geoid, level, year, decade
 
 
-    def get_final(self, extra_cols=None):
+    def get_final(self):
         attr = 'final'
         if (self.state.abbr != 'TX') or (self.level != 'vtd'):
             return False
@@ -141,7 +141,7 @@ select
     "{candidates}" as candidates,
     coalesce(B.D, 0) as dem_votes,
     coalesce(B.R, 0) as rep_votes,
-from {self.get_acs5_transformed(year=year, extra_cols=extra_cols)} as A
+from {self.get_acs5_transformed(year=year)} as A
 left join (
     select {geoid}, party, votes,
     from {self.get_elections()}
@@ -214,7 +214,7 @@ group by 1,2,3,4,5,6,7,8,9"""
         return tbl
 
 
-    def get_acs5_transformed(self, year=2018, extra_cols=None, overwrite=False):
+    def get_acs5_transformed(self, year=2018, overwrite=False):
         attr = 'acs5_transformed'
         tbl_src  = self.get_acs5(year=year)
         path_src, geoid_src, level_src, year_src, decade_src = self.parse(tbl_src)
@@ -223,6 +223,16 @@ group by 1,2,3,4,5,6,7,8,9"""
             path, geoid, level, year, decade = self.parse(tbl)
             feat = [x for x in self.bq.get_cols(tbl_src)[2:] if x[:3] != 'all']
 
+            qry = f"""
+select
+    S.year,
+    T.{geoid},
+    {ut.make_select([f'sum(S.{x} * T.{x[:x.rfind("_")]}_pop) as {x}' for x in feat], 2)},
+from {tbl_src} as S
+inner join {self.get_transformer(year=year_src, level=level_src)} as T
+using ({geoid_src})
+group by 1, 2"""
+            
             qry = f"""
 select
     A.*,
@@ -234,19 +244,35 @@ select
     G.perim,
     G.polsby_popper,
     {ut.make_select([f'A.white_{x} + A.hisp_{x} + A.other_{x} as all_{x}' for x in features_universal])},
-    {ut.make_select(extra_cols)}
 from (
-    select
-        S.year,
-        T.{geoid},
-        {ut.make_select([f'sum(S.{x} * T.{x[:x.rfind("_")]}_pop) as {x}' for x in feat], 2)},
-    from {tbl_src} as S
-    inner join {self.get_transformer(year=year_src, level=level_src)} as T
-    using ({geoid_src})
-    group by 1, 2
+    {ut.subquery(qry)}
 ) as A
 join {self.get_geo()} as G
 using ({geoid})"""
+            
+#             qry = f"""
+# select
+#     A.*,
+#     G.county2020,
+#     G.dist_to_border,
+#     G.aland,
+#     G.awater,
+#     G.atot,
+#     G.perim,
+#     G.polsby_popper,
+#     {ut.make_select([f'A.white_{x} + A.hisp_{x} + A.other_{x} as all_{x}' for x in features_universal])},
+# from (
+#     select
+#         S.year,
+#         T.{geoid},
+#         {ut.make_select([f'sum(S.{x} * T.{x[:x.rfind("_")]}_pop) as {x}' for x in feat], 2)},
+#     from {tbl_src} as S
+#     inner join {self.get_transformer(year=year_src, level=level_src)} as T
+#     using ({geoid_src})
+#     group by 1, 2
+# ) as A
+# join {self.get_geo()} as G
+# using ({geoid})"""
             print(qry)
             with Timer():
                 rpt(tbl)
