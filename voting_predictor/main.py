@@ -221,10 +221,12 @@ group by 1,2,3,4,5,6,7,8,9"""
         tbl = f'{tbl_src}_{self.level}2020'
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
             path, geoid, level, year, decade = self.parse(tbl)
-            feat = self.bq.get_cols(tbl_src)[2:]
+            feat = [x for x in self.bq.get_cols(tbl_src)[2:] if x[:3] != 'all']
+
             qry = f"""
 select
-    A.*,
+    A.year,
+    A.{geoid},
     G.county2020,
     G.dist_to_border,
     G.aland,
@@ -232,13 +234,15 @@ select
     G.atot,
     G.perim,
     G.polsby_popper,
-    {ut.make_select(extra_cols)}
+    {ut.make_select([f'white_{x} + hisp_{x} + other_{x} as all_{x}' for x in universal_features])},
+    {ut.make_select(feat)},
+    {ut.make_select(extra_cols)},
 from (
     select
-        A.year,
+        S.year,
         T.{geoid},
-        {ut.make_select([f'sum(A.{x} * T.{x[:x.rfind("_")]}_pop) as {x}' for x in feat], 2)},
-    from {tbl_src} as A
+        {ut.make_select([f'sum(S.{x} * T.{x[:x.rfind("_")]}_pop) as {x}' for x in feat], 2)},
+    from {tbl_src} as S
     inner join {self.get_transformer(year=year_src, level=level_src)} as T
     using ({geoid_src})
     group by 1, 2
@@ -268,7 +272,8 @@ using ({geoid})"""
                 for name, fields in features.items():
                     df[name] = df[fields].sum(axis=1)
                 df = df[['year', geoid, *sorted(features.keys())]]
-                for var in {name[name.find('_')+1:] for name in features.keys()}:
+                for var in features_universal:
+#                 for var in {name[name.find('_')+1:] for name in features.keys()}:
                     compute_other(df, var)
                 self.bq.df_to_tbl(df, tbl)
         return tbl
