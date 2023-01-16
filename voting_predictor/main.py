@@ -145,6 +145,7 @@ select
     "{candidates}" as candidates,
     coalesce(B.D, 0) as dem_votes,
     coalesce(B.R, 0) as rep_votes,
+    coalesce(B.D, 0) + coalesce(B.R, 0) as tot_votes,
 from {A} as A
 left join (
     select {geoid}, party, votes,
@@ -158,9 +159,8 @@ using ({geoid})
                 qry = f"""
 select
     *,
-    dem_votes + rep_votes as tot_votes,
-    dem_votes / (dem_votes + rep_votes) as dem_prop,
-    rep_votes / (dem_votes + rep_votes) as rep_prop,
+    case when tot_votes = 0  then = else dem_votes / tot_votes end as dem_prop,
+    case when tot_votes = 0  then = else rep_votes / tot_votes end as rep_prop,
 from (
     {ut.subquery(qry)}
 )"""
