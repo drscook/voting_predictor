@@ -163,7 +163,7 @@ select
     rep_votes / (dem_votes + rep_votes) as rep_prop,
 from (
     {ut.subquery(qry)}
-)
+)"""
                 
                 
                 L.append(qry)   
@@ -291,30 +291,6 @@ select
 from (
     {ut.subquery(qry)}
 )"""
-            
-#              qry = f"""
-# select
-#     A.*,
-#     G.county2020,
-#     G.dist_to_border,
-#     G.aland,
-#     G.awater,
-#     G.atot,
-#     G.perim,
-#     G.polsby_popper,
-#     {ut.make_select([f'A.white_{x} + A.hisp_{x} + A.other_{x} as all_{x}' for x in features_universal])},
-# from (
-#     select
-#         S.year,
-#         T.{geoid},
-#         {ut.make_select([f'sum(S.{x} * T.{x[:x.rfind("_")]}_pop) as {x}' for x in feat], 2)},
-#     from {tbl_src} as S
-#     inner join {self.get_transformer(year=year_src, level=level_src)} as T
-#     using ({geoid_src})
-#     group by 1, 2
-# ) as A
-# join {self.get_geo()} as G
-# using ({geoid})"""
             print(qry)
             with Timer():
                 rpt(tbl)
