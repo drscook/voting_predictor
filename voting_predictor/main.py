@@ -243,13 +243,13 @@ from (
         T.{geoid},
         {ut.make_select([f'sum(A.{x} * T.{x[:x.rfind("_")]}_pop) as {x}' for x in feat], 2)},
     from {tbl_src} as A
-    inner join {self.get_transformer(year=year_src)} as T
+    inner join {self.get_transformer(year=year_src, level=level_src)} as T
     using ({geoid_src})
     group by 1, 2
 ) as A
 join {self.get_geo()} as G
 using ({geoid})"""
-            print(qry)
+#             print(qry)
             with Timer():
                 rpt(tbl)
                 self.bq.qry_to_tbl(qry, tbl)
@@ -280,9 +280,9 @@ using ({geoid})"""
         return tbl
 
 
-    def get_transformer(self, year=2018):
+    def get_transformer(self, year=2018, level='tract'):
         attr = 'transformers'
-        tbl = f'{attr}.{self.state.abbr}_{self.level}{year}'
+        tbl = f'{attr}.{self.state.abbr}_{level}{year}'
         path, geoid, level, year, decade = self.parse(tbl)
         if not self.bq.get_tbl(tbl, overwrite=attr in self.refresh):
             qry = f"""
