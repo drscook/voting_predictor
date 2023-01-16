@@ -109,7 +109,7 @@ class Voting():
         if (self.state.abbr != 'TX') or (self.level != 'vtd'):
             return False
         tbl = f'{attr}.{self.state.abbr}_vtd2020'
-        if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls.values())):
+        if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
             path, geoid, level, year, decade = self.parse(tbl)
             qry = f"""
 select
@@ -164,7 +164,7 @@ using ({geoid})
             return False
         attr = 'elections'
         tbl = f'{attr}.{self.state.abbr}_vtd2022'
-        if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls.values())):
+        if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
             path, geoid, level, year, decade = self.parse(tbl)
             attr_raw = attr+'_raw'
             tbl_raw  = tbl+'_raw'
@@ -219,7 +219,7 @@ group by 1,2,3,4,5,6,7,8,9"""
         tbl_src  = self.get_acs5(year=year)
         path_src, geoid_src, level_src, year_src, decade_src = self.parse(tbl_src)
         tbl = f'{tbl_src}_{self.level}2020'
-        if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls.values())):
+        if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
             path, geoid, level, year, decade = self.parse(tbl)
             feat = self.bq.get_cols(tbl_src)[2:]
             qry = f"""
@@ -256,7 +256,7 @@ using ({geoid})"""
         attr = 'acs5'
         tbl = f'{attr}.{self.state.abbr}_tract{year}'
         path, geoid, level, year, decade = self.parse(tbl)
-        if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls.values())):
+        if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
             path, geoid, level, year, decade = self.parse(tbl)
             with Timer():
                 rpt(tbl)
@@ -278,7 +278,7 @@ using ({geoid})"""
     def get_transformer(self, year=2018, level='tract'):
         attr = 'transformers'
         tbl = f'{attr}.{self.state.abbr}_{level}{year}'
-        if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls.values())):
+        if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
             path, geoid, level, year, decade = self.parse(tbl)
             qry = f"""
 select
@@ -306,7 +306,7 @@ using ({geoid})"""
     def get_crosswalks(self):
         attr = 'crosswalks'
         tbl = f'{attr}.{self.state.abbr}_block2020'
-        if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls.values())):
+        if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
             path, geoid, level, year, decade = self.parse(tbl)
             attr_raw = attr+'_raw'
             tbl_raw  = tbl+'_raw'
@@ -356,7 +356,7 @@ using (block2010)"""
         else:
             attr = 'geo'
             tbl = r+self.level+'2020'
-        if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls.values())):
+        if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
             path, geoid, level, year, decade = self.parse(tbl)
             if block:
                 qry = f"""
@@ -436,7 +436,7 @@ using ({geoid})"""
             return False
         attr = 'plans'
         tbl = f'{attr}.{self.state.abbr}_block2020'
-        if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls.values())):
+        if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
             path, geoid, level, year, decade = self.parse(tbl)
             with Timer():
                 rpt(tbl)
@@ -476,7 +476,7 @@ using ({geoid})"""
     def get_assignments(self, year=2020):
         attr = 'assignments'
         tbl = f'{attr}.{self.state.abbr}_block{year}'
-        if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls.values())):
+        if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
             path, geoid, level, year, decade = self.parse(tbl)
             with Timer():
                 rpt(tbl)
@@ -505,7 +505,7 @@ using ({geoid})"""
     def get_pl(self):
         attr = 'pl'
         tbl = f'{attr}.{self.state.abbr}_block2020'
-        if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls.values())):
+        if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
             path, geoid, level, year, decade = self.parse(tbl)
             with Timer():
                 rpt(tbl)
@@ -522,7 +522,7 @@ using ({geoid})"""
     def get_shapes(self):
         attr = 'shapes'
         tbl = f'{attr}.{self.state.abbr}_block2020'
-        if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls.values())):
+        if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
             path, geoid, level, year, decade = self.parse(tbl)
             with Timer():
                 rpt(tbl)
