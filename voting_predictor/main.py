@@ -253,7 +253,7 @@ using ({geoid})"""
             with Timer():
                 rpt(tbl)
                 self.bq.qry_to_tbl(qry, tbl)
-                self.refresh.discard(attr)
+#                 self.refresh.discard(attr)
         return tbl
 
 
@@ -276,7 +276,7 @@ using ({geoid})"""
                 for var in {name[name.find('_')+1:] for name in features.keys()}:
                     compute_other(df, var)
                 self.bq.df_to_tbl(df, tbl)
-                self.refresh.discard(attr)
+#                 self.refresh.discard(attr)
         return tbl
 
 
