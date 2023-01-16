@@ -195,6 +195,6 @@ features = {
     'all_vap_homeowner': ['b25003_002e'],
     'white_vap_homeowner': ['b25003h_002e'],
     'hisp_vap_homeowner': ['b25003i_002e'],
-    'hisp_vap_spanishAtHome': ['b16004_026e'],
-    'hisp_vap_spanishAtHomeEnglishWell': ['b16004_027e', 'b16004_028e'],
+    'hisp_vap_spanishathome': ['b16004_026e'],
+    'hisp_vap_spanishathomeenglishwell': ['b16004_027e', 'b16004_028e'],
 }
