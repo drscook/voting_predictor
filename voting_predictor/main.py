@@ -217,10 +217,9 @@ group by 1,2,3,4,5,6,7,8,9"""
         attr = 'acs5_transformed'
         tbl_src  = self.get_acs5(year=year)
         tbl = f'{tbl_src}_{self.level}2020'
-        feat = self.bq.get_cols(tbl_src)[2:]        
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls.values())):
-            path_src, geoid_src, level_src, year_src, decade_src = self.parse(tbl_src)
             path, geoid, level, year, decade = self.parse(tbl)
+            feat = self.bq.get_cols(tbl_src)[2:]
             qry = f"""
 select
     A.*,
