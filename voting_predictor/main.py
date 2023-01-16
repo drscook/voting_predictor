@@ -221,13 +221,14 @@ group by 1,2,3,4,5,6,7,8,9"""
         tbl = f'{tbl_src}_{self.level}2020'
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
             path, geoid, level, year, decade = self.parse(tbl)
-            feat = [x for x in self.bq.get_cols(tbl_src)[2:] if x[:3] != 'all']
+#             feat = [x for x in self.bq.get_cols(tbl_src)[2:] if x[:3] != 'all']
+            feat = self.bq.get_cols(tbl_src)[2:]
 
             qry = f"""
 select
     S.year,
     T.{geoid},
-    {ut.make_select([f'sum(S.{x} * T.{x[:x.rfind("_")]}_pop) as {x}' for x in feat], 2)},
+    {ut.make_select([f'sum(S.{x} * T.{x[:x.rfind("_")]}_pop) as {x}' for x in feat if x[:3] != 'all'])},
 from {tbl_src} as S
 inner join {self.get_transformer(year=year_src, level=level_src)} as T
 using ({geoid_src})
@@ -250,7 +251,21 @@ from (
 join {self.get_geo()} as G
 using ({geoid})"""
             
-#             qry = f"""
+            def den(x):
+                if x in subpops.keys():
+                    return 'all'+x[ut.findn(x, '_', 1):]
+                else:
+                    return x[:ut.findn(x, '_', 2)+1]+'pop
+                    
+            qry = f"""
+select
+    *,
+    {ut.make_select([f'case when den({x}) = 0 then 0 else {x} / den({x}) end as {x}_prop' for x in feat])},
+from
+    {ut.subquery(qry)}
+)"""
+            
+#              qry = f"""
 # select
 #     A.*,
 #     G.county2020,
