@@ -255,7 +255,7 @@ using ({geoid})"""
                 if x in subpops.keys():
                     return 'all'+x[ut.findn(x, '_', 1):]
                 else:
-                    return x[:ut.findn(x, '_', 2)+1]+'pop
+                    return x[:ut.findn(x, '_', 2)+1]+'pop'
                     
             qry = f"""
 select
