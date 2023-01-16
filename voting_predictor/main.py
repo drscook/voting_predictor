@@ -219,10 +219,10 @@ group by 1,2,3,4,5,6,7,8,9"""
         attr = 'acs5_transformed'
         tbl_src  = self.get_acs5(year=year)
         path_src, geoid_src, level_src, year_src, decade_src = self.parse(tbl_src)
-        tbl = tbl_src.replace(level_src, self.level)
-        path, geoid, level , year, decade = self.parse(tbl)
-#         tbl = f'{tbl_src}_{self.level}2020'
-#         path    , geoid    , level    , year    , decade     = self.pa?rse(tbl)
+#         tbl = tbl_src.replace(level_src, self.level)
+#         path, geoid, level , year, decade = self.parse(tbl)
+        tbl = f'{tbl_src}_{self.level}2020'
+        path    , geoid    , level    , year    , decade     = self.pa?rse(tbl)
         feat = self.bq.get_cols(tbl_src)[2:]
         
 #         {ut.make_select([f'sum(A.{x} * T.{x[:x.rfind("_")]}_pop) as {x}' for x in features.keys()], 2)},
