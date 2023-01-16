@@ -198,3 +198,6 @@ features = {
     'hisp_vap_spanishathome': ['b16004_026e'],
     'hisp_vap_spanishathomeenglishwell': ['b16004_027e', 'b16004_028e'],
 }
+
+F = {f[f.find('_'):] for f in features.keys()}
+features_universal = {f[1:] for f in F if 'all'+f in features.keys() and 'white'+features.keys() in F and 'hisp'+f in features.keys()}
