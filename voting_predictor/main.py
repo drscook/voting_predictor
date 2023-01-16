@@ -183,7 +183,7 @@ from (
             path, geoid, level, year, decade = self.parse(tbl)
             attr_raw = attr+'_raw'
             tbl_raw  = tbl+'_raw'
-            if not self.bq.get_tbl(tbl, overwrite=(attr_raw in self.refresh) & (tbl_raw not in self.tbls.values())):
+            if not self.bq.get_tbl(tbl, overwrite=(attr_raw in self.refresh) & (tbl_raw not in self.tbls)):
                 path_raw, geoid_raw, level_raw, year_raw, decade_raw = self.parse(tbl_raw)
                 with Timer():
                     rpt(tbl_raw)
