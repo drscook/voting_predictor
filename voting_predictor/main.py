@@ -140,7 +140,7 @@ group by campaign"""
                 cols = cols1 + cols2
                 qry = f"""
 select 
-    {ut.select(cols)},
+    {ut.make_select(cols)},
     "{campaign}" as campaign,
     "{candidates}" as candidates,
     coalesce(B.D, 0) as dem_votes,
