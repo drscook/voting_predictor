@@ -221,6 +221,10 @@ group by 1,2,3,4,5,6,7,8,9"""
         tbl = f'{tbl_src}_{self.level}2020'
         path_src, geoid_src, level_src, year_src, decade_src = self.parse(tbl_src)
         path    , geoid    , level    , year    , decade     = self.parse(tbl)
+        feat = self.bq.get_cols(tbl_src)[2:]
+        
+#         {ut.make_select([f'sum(A.{x} * T.{x[:x.rfind("_")]}_pop) as {x}' for x in features.keys()], 2)},
+        
         if not self.bq.get_tbl(tbl, overwrite=attr in self.refresh):
             qry = f"""
 select
@@ -237,7 +241,7 @@ from (
     select
         A.year,
         T.{geoid},
-        {ut.make_select([f'sum(A.{x} * T.{x[:x.rfind("_")]}_pop) as {x}' for x in features.keys()], 2)},
+        {ut.make_select([f'sum(A.{x} * T.{x[:x.rfind("_")]}_pop) as {x}' for x in feat], 2)},
     from {tbl_src} as A
     inner join {self.get_transformer(year=year_src)} as T
     using ({geoid_src})
