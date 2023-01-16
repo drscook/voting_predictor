@@ -412,10 +412,10 @@ from (
         select
             {geoid},
             st_distance(geometry, (select st_boundary(us_outline_geom) from bigquery-public-data.geo_us_boundaries.national_outline)) as dist_to_border,
-            aland,
-            awater,
-            st_area(geometry) as atot,
-            st_perimeter(geometry) as perim,
+            aland / 1000  / 1000,
+            awater  / 1000  / 1000,
+            st_area(geometry) / 1000  / 1000 as atot,
+            st_perimeter(geometry) / 1000 as perim,
             geometry,
         from {self.get_shapes()})
     ) as S
@@ -581,6 +581,7 @@ using ({geoid})"""
 
                 repl = {f'geoid{d}':geoid, f'aland{d}': 'aland', f'awater{d}': 'awater', 'geometry':'geometry',}
                 df = ut.prep(gpd.read_file(zip_file)).rename(columns=repl)[repl.values()].to_crs(crs['bigquery'])
-                df.geometry = df.geometry.buffer(0).apply(orient, args=(1,))
+#                 df.geometry = df.geometry.buffer(0).apply(orient, args=(1,))
+                df.geometry = df.geometry.apply(orient, args=(1,))
                 self.bq.df_to_tbl(df, tbl)
         return tbl
