@@ -59,7 +59,7 @@ class Voting():
         self.census_session = census.Census(self.census_api_key)
         self.bq = ut.BigQuery(project_id=self.bq_project_id)
         self.state = us.states.lookup(self.state)
-        self.tbls = dict()
+        self.tbls = set()
         dependencies = {
             'shapes':'geo_raw', 'pl':'geo_raw', 'plans':'geo_raw', 'assignments':{'geo_raw', 'crosswalks'},
             'geo_raw':{'geo', 'crosswalks'}, 'geo': {'acs5_transformed', 'elections'},
@@ -94,7 +94,8 @@ class Voting():
 
     def parse(self, tbl):
         attr = tbl.split('.')[0]
-        self.tbls[attr] = tbl
+#         self.tbls[attr] = tbl
+        self.tbls.add(tbl)
         path = self.data_path / attr
         g = tbl.split('_')[-1]
         level, year = g[:-4], int(g[-4:])
