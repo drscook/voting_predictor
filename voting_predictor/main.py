@@ -225,8 +225,7 @@ group by 1,2,3,4,5,6,7,8,9"""
 
             qry = f"""
 select
-    A.year,
-    A.{geoid},
+    A.*,
     G.county2020,
     G.dist_to_border,
     G.aland,
@@ -235,7 +234,6 @@ select
     G.perim,
     G.polsby_popper,
     {ut.make_select([f'A.white_{x} + A.hisp_{x} + A.other_{x} as all_{x}' for x in features_universal])},
-    {ut.make_select(feat)},
     {ut.make_select(extra_cols)}
 from (
     select
