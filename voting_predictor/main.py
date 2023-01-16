@@ -94,7 +94,6 @@ class Voting():
 
     def parse(self, tbl):
         attr = tbl.split('.')[0]
-#         self.tbls[attr] = tbl
         self.tbls.add(tbl)
         path = self.data_path / attr
         g = tbl.split('_')[-1]
@@ -159,8 +158,8 @@ using ({geoid})
                 qry = f"""
 select
     *,
-    case when tot_votes = 0  then = else dem_votes / tot_votes end as dem_prop,
-    case when tot_votes = 0  then = else rep_votes / tot_votes end as rep_prop,
+    case when tot_votes = 0  then 0 else dem_votes / tot_votes end as dem_prop,
+    case when tot_votes = 0  then 0 else rep_votes / tot_votes end as rep_prop,
 from (
     {ut.subquery(qry)}
 )"""
@@ -168,7 +167,7 @@ from (
                 
                 L.append(qry)   
             qry = ut.join(L, '\nunion all\n')
-            # print(qry)
+            print(qry)
             with Timer():
                 rpt(tbl)
                 self.bq.qry_to_tbl(qry, tbl)
