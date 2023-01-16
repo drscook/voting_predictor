@@ -184,7 +184,7 @@ from (
             attr_raw = attr+'_raw'
             tbl_raw  = tbl+'_raw'
             if not self.bq.get_tbl(tbl, overwrite=(attr_raw in self.refresh) & (tbl_raw not in self.tbls)):
-                self.tbls.append(tbl_raw)
+                self.tbls.add(tbl_raw)
                 with Timer():
                     rpt(tbl_raw)
                     zip_file = path / f'2020-general-vtd-election-data-2020.zip'
