@@ -412,8 +412,8 @@ from (
         select
             {geoid},
             st_distance(geometry, (select st_boundary(us_outline_geom) from bigquery-public-data.geo_us_boundaries.national_outline)) as dist_to_border,
-            aland / 1000  / 1000,
-            awater  / 1000  / 1000,
+            aland / 1000  / 1000 as aland,
+            awater  / 1000  / 1000 as awater,
             st_area(geometry) / 1000  / 1000 as atot,
             st_perimeter(geometry) / 1000 as perim,
             geometry,
@@ -439,7 +439,7 @@ select * except (geometry), geometry,
 from (
     select *, case when perim < 0.1 then 0 else 4 * {np.pi} * atot / (perim * perim) end as polsby_popper,
     from (
-        select *, st_perimeter(geometry) as perim,        
+        select *, st_perimeter(geometry) / 1000 as perim,        
         from (
             select
                 {geoid},
@@ -580,8 +580,7 @@ using ({geoid})"""
                 download(zip_file, url, unzip=False)
 
                 repl = {f'geoid{d}':geoid, f'aland{d}': 'aland', f'awater{d}': 'awater', 'geometry':'geometry',}
-                df = ut.prep(gpd.read_file(zip_file)).rename(columns=repl)[repl.values()]#.to_crs(crs['census'])
-#                 df.geometry = df.geometry.buffer(0).apply(orient, args=(1,))
+                df = ut.prep(gpd.read_file(zip_file)).rename(columns=repl)[repl.values()]
                 df.geometry = df.geometry.apply(orient, args=(1,))
                 self.bq.df_to_tbl(df, tbl)
         return tbl
