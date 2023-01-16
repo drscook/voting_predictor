@@ -236,9 +236,7 @@ group by 1,2,3,4,5,6,7,8,9"""
         tbl = f'{tbl_src}_{self.level}2020'
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
             path, geoid, level, year, decade = self.parse(tbl)
-#             feat = [x for x in self.bq.get_cols(tbl_src)[2:] if x[:3] != 'all']
             feat = self.bq.get_cols(tbl_src)[2:]
-
             qry = f"""
 select
     S.year,
@@ -356,7 +354,7 @@ using ({geoid})"""
             attr_raw = attr+'_raw'
             tbl_raw  = tbl+'_raw'
             if not self.bq.get_tbl(tbl, overwrite=(attr_raw in self.refresh) & (tbl_raw not in self.tbls.values())):
-                path_raw, geoid_raw, level_raw, year_raw, decade_raw = self.parse(tbl_raw)
+                self.tbls.add(tbl_raw)
                 with Timer():
                     rpt(tbl_raw)
                     zip_file = path / f'TAB2010_TAB2020_ST{self.state.fips}.zip'
