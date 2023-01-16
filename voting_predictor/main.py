@@ -245,7 +245,7 @@ from (
 ) as A
 join {self.get_geo()} as G
 using ({geoid})"""
-#             print(qry)
+            print(qry)
             with Timer():
                 rpt(tbl)
                 self.bq.qry_to_tbl(qry, tbl)
