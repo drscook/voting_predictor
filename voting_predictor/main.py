@@ -134,14 +134,18 @@ group by campaign"""
             L = []
             for campaign, candidates in campaigns:
                 office, year = campaign.split('_')
+                A = self.get_acs5_transformed(year=year)
+                cols1 = ['year', geoid, 'county2020', 'aland', 'awater', 'atot', 'perim', 'polsby_popper']
+                cols2 = sorted(ut.setify(self.bq.get_cols(A)).difference(cols1))
+                cols = cols1 + cols2
                 qry = f"""
 select 
-    A.*,
+    {ut.select(cols)},
     "{campaign}" as campaign,
     "{candidates}" as candidates,
     coalesce(B.D, 0) as dem_votes,
     coalesce(B.R, 0) as rep_votes,
-from {self.get_acs5_transformed(year=year)} as A
+from {A} as A
 left join (
     select {geoid}, party, votes,
     from {self.get_elections()}
@@ -150,6 +154,18 @@ left join (
 ) as B
 using ({geoid})
 """
+                
+                qry = f"""
+select
+    *,
+    dem_votes + rep_votes as tot_votes,
+    dem_votes / (dem_votes + rep_votes) as dem_prop,
+    rep_votes / (dem_votes + rep_votes) as rep_prop,
+from (
+    {ut.subquery(qry)}
+)
+                
+                
                 L.append(qry)   
             qry = ut.join(L, '\nunion all\n')
             # print(qry)
