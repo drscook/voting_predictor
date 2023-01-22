@@ -133,7 +133,7 @@ group by campaign"""
             L = []
             for campaign, candidates in campaigns:
                 office, year = campaign.split('_')
-                year = min(year, datetime.date.today().year-2)
+                year = min(int(year), datetime.date.today().year-2)
                 A = self.get_acs5_transformed(year=year)
                 cols1 = ['year', geoid, 'county2020', 'aland', 'awater', 'atot', 'perim', 'polsby_popper']
                 cols2 = sorted(ut.setify(self.bq.get_cols(A)).difference(cols1))
