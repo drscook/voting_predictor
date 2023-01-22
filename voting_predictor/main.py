@@ -315,7 +315,6 @@ from (
                     df[name] = df[fields].sum(axis=1)
                 df = df[['year', geoid, *sorted(features.keys())]]
                 for var in features_universal:
-#                 for var in {name[name.find('_')+1:] for name in features.keys()}:
                     compute_other(df, var)
                 self.bq.df_to_tbl(df, tbl)
         return tbl
