@@ -341,7 +341,7 @@ inner join (
 ) as B
 using ({geoid})
 group by {g}block2020, block_group2020, tract2020, vtd2020, county2020"""
-            print(qry)
+#             print(qry)
             with Timer():
                 rpt(tbl)
                 self.bq.qry_to_tbl(qry, tbl)
