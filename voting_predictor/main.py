@@ -334,14 +334,15 @@ select
     A.tract2020,
     A.vtd2020,
     A.county2020,
-    {ut.make_select([f'case when B.{x} = 0 then 0 else A.{x} / B.{x} end as {x}' for x in subpops.keys()])},
+    {ut.make_select([f'sum(case when B.{x} = 0 then 0 else A.{x} / B.{x} end) as {x}' for x in subpops.keys()])},
 from {self.get_crosswalks()} as A
 inner join (
     select {geoid}, {ut.make_select([f'sum({x}) as {x}' for x in subpops.keys()], 2)},
     from {self.get_crosswalks()}
     group by {geoid}
 ) as B
-using ({geoid})"""
+using ({geoid})
+group by 1,2,3,4,5,6"""
             # print(qry)
             with Timer():
                 rpt(tbl)
