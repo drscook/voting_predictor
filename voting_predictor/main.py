@@ -326,9 +326,10 @@ from (
         tbl = f'{attr}.{self.state.abbr}_{level}{year}'
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
             path, geoid, level, year, decade = self.parse(tbl)
+            g = geoid+',' if year<2020 else ''
             qry = f"""
 select
-    {geoid+',' if year<2020 else ''}
+    {g}
     A.block2020,
     A.block_group2020,
     A.tract2020,
@@ -342,8 +343,8 @@ inner join (
     group by {geoid}
 ) as B
 using ({geoid})
-group by 1,2,3,4,5,6"""
-            # print(qry)
+group by {g}block2020, block_group2020, tract2020, vtd2020, county2020"""
+            print(qry)
             with Timer():
                 rpt(tbl)
                 self.bq.qry_to_tbl(qry, tbl)
