@@ -323,7 +323,7 @@ from (
         tbl = f'{attr}.{self.state.abbr}_{level}{get_decade(year)}'
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
             path, geoid, level, year, decade = self.parse(tbl)
-            g = geoid+',' if year<2020 else ''
+            g = geoid+', ' if year<2020 else ''
             qry = f"""
 select
     {g}
