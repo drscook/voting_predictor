@@ -323,7 +323,7 @@ from (
 
     def get_transformer(self, year=2018, level='tract'):
         attr = 'transformers'
-        tbl = f'{attr}.{self.state.abbr}_{level}{year}'
+        tbl = f'{attr}.{self.state.abbr}_{level}{get_decade(year)}'
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
             path, geoid, level, year, decade = self.parse(tbl)
             g = geoid+',' if year<2020 else ''
@@ -523,7 +523,7 @@ using ({geoid})"""
 
     def get_assignments(self, year=2020):
         attr = 'assignments'
-        tbl = f'{attr}.{self.state.abbr}_block{year}'
+        tbl = f'{attr}.{self.state.abbr}_block{get_decade(year)}'
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
             path, geoid, level, year, decade = self.parse(tbl)
             with Timer():
