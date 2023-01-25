@@ -188,11 +188,8 @@ from (
                 self.tbls.add(tbl_raw)
                 with Timer():
                     rpt(tbl_raw)
-#                     zip_file = path / f'2020-general-vtd-election-data-2020.zip'
-#                     url = f'https://data.capitol.texas.gov/dataset/35b16aee-0bb0-4866-b1ec-859f1f044241/resource/5af9f5e2-ca14-4e5d-880e-3c3cd891d3ed/download/{zip_file.name}'
                     zip_file = path / f'2022-general-vtds-election-data.zip'                
                     url = f'https://data.capitol.texas.gov/dataset/35b16aee-0bb0-4866-b1ec-859f1f044241/resource/b9ebdbdb-3e31-4c98-b158-0e2993b05efc/download/{zip_file.name}'
-                    
                     download(zip_file, url)
 
                     L = []
