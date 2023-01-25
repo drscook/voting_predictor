@@ -355,7 +355,7 @@ group by {g}block2020, block_group2020, tract2020, vtd2020, county2020"""
             path, geoid, level, year, decade = self.parse(tbl)
             attr_raw = attr+'_raw'
             tbl_raw  = tbl+'_raw'
-            if not self.bq.get_tbl(tbl_raw, overwrite=(attr_raw in self.refresh) & (tbl_raw not in self.tbls.values())):
+            if not self.bq.get_tbl(tbl_raw, overwrite=(attr_raw in self.refresh) & (tbl_raw not in self.tbls)):
                 self.tbls.add(tbl_raw)
                 with Timer():
                     rpt(tbl_raw)
