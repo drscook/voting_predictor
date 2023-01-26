@@ -411,7 +411,10 @@ using (block2020)"""
             if block:
                 qry = f"""
 select
-    * except (geometry),
+    {geoid},
+    P.county,
+    S.* except (geometry),
+    P.* except (county),
     geometry,
 from (
     select
