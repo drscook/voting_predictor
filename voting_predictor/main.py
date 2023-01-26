@@ -95,7 +95,6 @@ class Voting():
 
     def parse(self, tbl):
         attr = tbl.split('.')[0]
-#         self.tbls.add(tbl)
         path = self.data_path / attr
         g = tbl.split('_')[-1]
         level, year = g[:-4], int(g[-4:])
@@ -104,13 +103,19 @@ class Voting():
         return path, geoid, level, year, decade
 
 
-    def run_qry(self, qry, tbl, show=False):
+    def qry_to_tbl(self, qry, tbl, show=False):
         with Timer():
             rpt(tbl)
             if show:
                 print(qry)
             self.bq.qry_to_tbl(qry, tbl)
             self.tbls.add(tbl)
+            
+    
+    def df_to_tbl(self, df, tbl, cols=None):
+        cols = ut.listify(cols) if cols else df.columns
+        self.bq.df_to_tbl(ut.prep(df[df.columns.intersection(cols)]), tbl)
+        self.tbls.add(tbl)
 
 
     def get_final(self):
@@ -175,10 +180,7 @@ from (
 )"""
                 L.append(qry)   
             qry = ut.join(L, '\nunion all\n')
-#             print(qry)
-            with Timer():
-                rpt(tbl)
-                self.bq.qry_to_tbl(qry, tbl)
+            self.qry_to_tbl(qry, tbl)
         return tbl
     
     
@@ -216,8 +218,7 @@ from (
                                 df['incumbent'] = df['incumbent'] == 'Y'
                                 L.append(df.loc[mask, cols])
                     df = ut.prep(pd.concat(L, axis=0)).reset_index(drop=True)
-                    self.bq.df_to_tbl(df[cols], tbl_raw)
-                    self.tbls.add(tbl_raw)
+                    self.df_to_tbl(df, tbl_raw)
             qry = f"""
 select
     coalesce(B.vtd2020, C.vtd2020) as vtd2020,
@@ -230,11 +231,7 @@ on A.fips || A.vtd2020 = B.vtd2020
 left join {self.get_geo()} as C
 on A.fips || '0' || left(A.vtd2020, 5) = C.vtd2020
 group by 1,2,3,4,5,6,7,8,9"""
-            # print(qry)
-            with Timer():
-                rpt(tbl)
-                self.bq.qry_to_tbl(qry, tbl)
-                self.tbls.add(tbl)
+            self.qry_to_tbl(qry, tbl)
         return tbl
 
 
@@ -297,11 +294,7 @@ select
 from (
     {ut.subquery(qry)}
 )"""
-#             print(qry)
-            with Timer():
-                rpt(tbl)
-                self.bq.qry_to_tbl(qry, tbl)
-                self.tbls.add(tbl)
+            self.qry_to_tbl(qry, tbl)
         return tbl
 
 
@@ -323,7 +316,7 @@ from (
                 df = df[['year', geoid, *sorted(features.keys())]]
                 for var in features_universal:
                     compute_other(df, var)
-                self.bq.df_to_tbl(df, tbl)
+                self.df_to_tbl(df, tbl)
         return tbl
 
 
@@ -350,10 +343,7 @@ inner join (
 ) as B
 using ({geoid})
 group by {g}block2020, block_group2020, tract2020, vtd2020, county2020"""
-#             print(qry)
-            with Timer():
-                rpt(tbl)
-                self.bq.qry_to_tbl(qry, tbl)
+            self.qry_to_tbl(qry, tbl)
         return tbl
 
 
@@ -377,8 +367,7 @@ group by {g}block2020, block_group2020, tract2020, vtd2020, county2020"""
                     for dec in [2010, 2020]:
                         geoid = get_geoid(df, dec)
                         df[f'aprop{dec}'] = df['aland'] / np.fmax(df.groupby(geoid)['aland'].transform('sum'), 1)
-                    df = ut.prep(df[['block2010', 'block2020', 'aland', 'aprop2010', 'aprop2020']])
-                    self.bq.df_to_tbl(df, tbl_raw)
+                    self.df_to_tbl(df, tbl_raw, cols=['block2010', 'block2020', 'aland', 'aprop2010', 'aprop2020'])
             qry = f"""
 select
     C.*,
@@ -395,10 +384,7 @@ left join {self.get_geo(block=True)} as G
 using (block2020)
 left join {self.get_assignments(year=2010)} as A
 using (block2010)"""
-            # print(qry)
-            with Timer():
-                rpt(tbl)
-                self.bq.qry_to_tbl(qry, tbl)
+            self.qry_to_tbl(qry, tbl)
         return tbl
 
 
@@ -478,10 +464,7 @@ join (
     qualify row_number() over (partition by {geoid} order by all_tot_pop desc) = 1
 ) as D
 using ({geoid})"""
-            # print(qry)
-            with Timer():
-                rpt(tbl)
-                self.bq.qry_to_tbl(qry, tbl)
+            self.qry_to_tbl(qry, tbl)
         return tbl
 
 
@@ -522,8 +505,7 @@ using ({geoid})"""
                         df = ut.prep(pd.read_csv(file, names=[geoid, plan], header=0)).set_index(geoid)
                         if df[plan].nunique() == district_types[plan[4]]:
                             L.append(df)
-                df = ut.prep(pd.concat(L, axis=1))
-                self.bq.df_to_tbl(df, tbl)
+                self.df_to_tbl(pd.concat(L, axis=1), tbl)
         return tbl
 
 
@@ -568,8 +550,7 @@ using ({geoid})"""
                 compute_other(df, 'tot_pop')
                 compute_other(df, 'vap_pop')
                 df['county2020'] = df['name'].str.split(', ', expand=True)[3].str[:-7]
-                df = df[[geoid, *subpops.keys(), 'county2020']]
-                self.bq.df_to_tbl(df, tbl)
+                self.df_to_tbl(df, tbl, cols=[geoid, *subpops.keys(), 'county2020'])
         return tbl
 
 
@@ -585,7 +566,7 @@ using ({geoid})"""
                 repl = {'vtdkey':f'vtd{year}', f'geoid{d}':geoid, f'aland{d}': 'aland', f'awater{d}': 'awater', 'geometry':'geometry',}
                 df = ut.prep(gpd.read_file(zip_file)).rename(columns=repl)
                 df.geometry = df.geometry.to_crs(CRS['bigquery']).buffer(0).apply(orient, args=(1,))
-                self.bq.df_to_tbl(df[df.columns.intersection(repl.values())], tbl)
+                self.df_to_tbl(df, tbl, cols=repl.values()))
         return tbl
 
 
