@@ -565,7 +565,7 @@ using ({geoid})"""
 
 
     def get_shapes(self, attr, year, url):
-        tbl = f'{attr}.{self.state.abbr}_{attr}{year}'
+        tbl = f'shapes.{self.state.abbr}_{attr}{year}'
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
             path, geoid, level, year, decade = self.parse(tbl)
             with Timer():
