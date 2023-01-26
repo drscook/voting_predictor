@@ -77,7 +77,7 @@ class Voting():
             'transformer':'acs5_transformed',
             'acs5': 'acs5_transformed',
             'acs5_transformed':'final',
-            'elections_raw': 'election',
+            'election_raw': 'election',
             'election':'final',
             'final':set()}
         self.refresh = ut.setify(self.refresh)
