@@ -423,7 +423,7 @@ from (
         st_area(st_intersection(B.geometry, V.geometry)) / atot as areaint,
     from (
         select
-            *,
+            {geoid},
             st_distance(geometry, (select st_boundary(us_outline_geom) from bigquery-public-data.geo_us_boundaries.national_outline)) as dist_to_border,
             aland / 1000  / 1000 as aland,
             awater  / 1000  / 1000 as awater,
