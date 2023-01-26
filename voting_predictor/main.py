@@ -66,7 +66,7 @@ class Voting():
         self.tbls = set()
         dependencies = {
             'block':'geo_block',
-            'vtd':'geo',
+            self.level:'geo',
             'pl':'geo_block',
             'plan':'geo_block',
 #             'assignments':{'geo_block', 'crosswalks'},
