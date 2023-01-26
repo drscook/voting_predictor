@@ -48,11 +48,12 @@ class Voting():
     census_api_key: str
     bq_project_id: str
     state: str = 'TX'
-    level: str = 'vtd'
+    geoid: str = 'vtd2022'
     root_path:str = '/content/'
     refresh: tuple = () 
     
     def __post_init__(self):
+        self.level, self.year = self.geoid[:-4], int(self.geoid[-4:])
         self.root_path = pathlib.Path(self.root_path)
         self.data_path = self.root_path / 'data'
         self.data_path.mkdir(parents=True, exist_ok=True)
@@ -94,7 +95,7 @@ class Voting():
 
     def parse(self, tbl):
         attr = tbl.split('.')[0]
-        self.tbls.add(tbl)
+#         self.tbls.add(tbl)
         path = self.data_path / attr
         g = tbl.split('_')[-1]
         level, year = g[:-4], int(g[-4:])
@@ -107,7 +108,7 @@ class Voting():
         attr = 'final'
         if (self.state.abbr != 'TX') or (self.level != 'vtd'):
             return False
-        tbl = f'{attr}.{self.state.abbr}_vtd2020'
+        tbl = f'{attr}.{self.state.abbr}_{self.geoid}'
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
             path, geoid, level, year, decade = self.parse(tbl)
             qry = f"""
@@ -155,7 +156,6 @@ left join (
 ) as B
 using ({geoid})
 """
-                
                 qry = f"""
 select
     *,
@@ -164,8 +164,6 @@ select
 from (
     {ut.subquery(qry)}
 )"""
-                
-                
                 L.append(qry)   
             qry = ut.join(L, '\nunion all\n')
 #             print(qry)
@@ -179,13 +177,12 @@ from (
         if (self.state.abbr != 'TX') or (self.level != 'vtd'):
             return False
         attr = 'elections'
-        tbl = f'{attr}.{self.state.abbr}_vtd2022'
+        tbl = f'{attr}.{self.state.abbr}_{self.geoid}'
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
             path, geoid, level, year, decade = self.parse(tbl)
             attr_raw = attr+'_raw'
             tbl_raw  = tbl+'_raw'
             if not self.bq.get_tbl(tbl_raw, overwrite=(attr_raw in self.refresh) & (tbl_raw not in self.tbls)):
-                self.tbls.add(tbl_raw)
                 with Timer():
                     rpt(tbl_raw)
                     zip_file = path / f'2022-general-vtds-election-data.zip'                
@@ -211,6 +208,7 @@ from (
                                 L.append(df.loc[mask, cols])
                     df = ut.prep(pd.concat(L, axis=0)).reset_index(drop=True)
                     self.bq.df_to_tbl(df[cols], tbl_raw)
+                    self.tbls.add(tbl_raw)
             qry = f"""
 select
     coalesce(B.vtd2020, C.vtd2020) as vtd2020,
@@ -227,6 +225,7 @@ group by 1,2,3,4,5,6,7,8,9"""
             with Timer():
                 rpt(tbl)
                 self.bq.qry_to_tbl(qry, tbl)
+                self.tbls.add(tbl)
         return tbl
 
 
@@ -234,7 +233,7 @@ group by 1,2,3,4,5,6,7,8,9"""
         attr = 'acs5_transformed'
         tbl_src  = self.get_acs5(year=year)
         path_src, geoid_src, level_src, year_src, decade_src = self.parse(tbl_src)
-        tbl = f'{tbl_src}_{self.level}2020'
+        tbl = f'{tbl_src}_{self.geoid}'
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
             path, geoid, level, year, decade = self.parse(tbl)
             feat = self.bq.get_cols(tbl_src)[2:]
@@ -293,6 +292,7 @@ from (
             with Timer():
                 rpt(tbl)
                 self.bq.qry_to_tbl(qry, tbl)
+                self.tbls.add(tbl)
         return tbl
 
 
@@ -396,10 +396,10 @@ using (block2010)"""
     def get_geo(self, block=False):
         r = f'geo.{self.state.abbr}_'
         if block:
-            attr = 'geo_raw'
+            attr = 'geo_blocks'
             tbl = r+'block2020'
         else:
-            attr = 'geo'
+            attr = 'geo_'+self.level
             tbl = r+self.level+'2020'
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
             path, geoid, level, year, decade = self.parse(tbl)
@@ -518,33 +518,33 @@ using ({geoid})"""
         return tbl
 
 
-    def get_assignments(self, year=2020):
-        attr = 'assignments'
-        tbl = f'{attr}.{self.state.abbr}_block{get_decade(year)}'
-        if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
-            path, geoid, level, year, decade = self.parse(tbl)
-            with Timer():
-                rpt(tbl)
-                zip_file = path / f'BlockAssign_ST{self.state.fips}_{self.state.abbr}.zip'
-                if decade == 2010:
-                    url = f'https://www2.census.gov/geo/docs/maps-data/data/baf/{zip_file.name}'
-                elif decade == 2020:
-                    url = f'https://www2.census.gov/geo/docs/maps-data/data/baf{decade}/{zip_file.name}'
-                download(zip_file, url)
+#     def get_assignments(self, year=2020):
+#         attr = 'assignments'
+#         tbl = f'{attr}.{self.state.abbr}_block{get_decade(year)}'
+#         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
+#             path, geoid, level, year, decade = self.parse(tbl)
+#             with Timer():
+#                 rpt(tbl)
+#                 zip_file = path / f'BlockAssign_ST{self.state.fips}_{self.state.abbr}.zip'
+#                 if decade == 2010:
+#                     url = f'https://www2.census.gov/geo/docs/maps-data/data/baf/{zip_file.name}'
+#                 elif decade == 2020:
+#                     url = f'https://www2.census.gov/geo/docs/maps-data/data/baf{decade}/{zip_file.name}'
+#                 download(zip_file, url)
 
-                dist = {'VTD':f'vtd{decade}', 'CD':f'congress{decade-10}', 'SLDU':f'senate{decade-10}', 'SLDL':f'house{decade-10}'}
-                L = []
-                for abbr, name in dist.items():
-                    f = zip_file.parent / f'{zip_file.stem}_{abbr}.txt'
-                    df = ut.prep(pd.read_csv(f, sep='|'))
-                    if abbr == 'VTD':
-                        # create vtd id using 3 fips + 6 vtd, pad on left with 0 as needed
-                        df['district'] = self.state.fips + ut.rjust(df['countyfp'], 3) + ut.rjust(df['district'], 6)
-                    repl = {'blockid': geoid, 'district':name}
-                    L.append(df.rename(columns=repl)[repl.values()].set_index(geoid))
-                df = pd.concat(L, axis=1)
-                self.bq.df_to_tbl(df, tbl)
-        return tbl
+#                 dist = {'VTD':f'vtd{decade}', 'CD':f'congress{decade-10}', 'SLDU':f'senate{decade-10}', 'SLDL':f'house{decade-10}'}
+#                 L = []
+#                 for abbr, name in dist.items():
+#                     f = zip_file.parent / f'{zip_file.stem}_{abbr}.txt'
+#                     df = ut.prep(pd.read_csv(f, sep='|'))
+#                     if abbr == 'VTD':
+#                         # create vtd id using 3 fips + 6 vtd, pad on left with 0 as needed
+#                         df['district'] = self.state.fips + ut.rjust(df['countyfp'], 3) + ut.rjust(df['district'], 6)
+#                     repl = {'blockid': geoid, 'district':name}
+#                     L.append(df.rename(columns=repl)[repl.values()].set_index(geoid))
+#                 df = pd.concat(L, axis=1)
+#                 self.bq.df_to_tbl(df, tbl)
+#         return tbl
 
 
     def get_pl(self):
@@ -564,8 +564,8 @@ using ({geoid})"""
         return tbl
 
 
-    def get_shapes(self, attr, year, url):
-        tbl = f'shapes.{self.state.abbr}_{attr}{year}'
+    def get_shapes(self, geoid, url):
+        tbl = f'shapes.{self.state.abbr}_{geoid}'
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
             path, geoid, level, year, decade = self.parse(tbl)
             with Timer():
@@ -582,12 +582,12 @@ using ({geoid})"""
 
     def get_vtds(self):
         url = 'https://data.capitol.texas.gov/dataset/4d8298d0-d176-4c19-b174-42837027b73e/resource/037e1de6-a862-49de-ae31-ae609e214972/download/vtds_22g.zip'
-        return self.get_shapes('vtds', 2022, url)
+        return self.get_shapes('vtd2022', url)
 
 
     def get_blocks(self):
         url = f'https://www2.census.gov/geo/tiger/TIGER2020/TABBLOCK20/tl_2020_{self.state.fips}_tabblock20.zip'
-        return self.get_shapes('blocks', 2020, url)
+        return self.get_shapes('block2020', url)
     
 
     
