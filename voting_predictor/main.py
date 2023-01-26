@@ -578,7 +578,6 @@ using ({geoid})"""
 #                 df.geometry = df.geometry.buffer(0).apply(orient, args=(1,))
                 df = ut.prep(gpd.read_file(zip_file)).rename(columns=repl)
                 df.geometry = df.geometry.to_crs(CRS['bigquery']).buffer(0).apply(orient, args=(1,))
-
                 self.bq.df_to_tbl(df[df.columns.intersection(repl.values())], tbl)
         return tbl
 
