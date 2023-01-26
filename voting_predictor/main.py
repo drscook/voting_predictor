@@ -65,7 +65,10 @@ class Voting():
         self.state = us.states.lookup(self.state)
         self.tbls = set()
         dependencies = {
-            'shapes':'geo_raw', 'pl':'geo_raw', 'plans':'geo_raw', 'assignments':{'geo_raw', 'crosswalks'},
+            
+            
+            
+            'blocks':'geo_raw', 'pl':'geo_raw', 'plans':'geo_raw', 'assignments':{'geo_raw', 'crosswalks'},
             'geo_raw':{'geo', 'crosswalks'}, 'geo': {'acs5_transformed', 'elections'},
             'crosswalks_raw':'crosswalks', 'crosswalks': 'transformers', 'transformers':'acs5_transformed',
             'acs5': 'acs5_transformed','acs5_transformed':'final',
@@ -562,7 +565,7 @@ using ({geoid})"""
         return tbl
 
 
-    def get_shapes(self, geoid, url):
+    def get_shapes(self, attr, geoid, url):
         tbl = f'shapes.{self.state.abbr}_{geoid}'
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
             path, geoid, level, year, decade = self.parse(tbl)
@@ -580,12 +583,12 @@ using ({geoid})"""
 
     def get_vtds(self):
         url = 'https://data.capitol.texas.gov/dataset/4d8298d0-d176-4c19-b174-42837027b73e/resource/037e1de6-a862-49de-ae31-ae609e214972/download/vtds_22g.zip'
-        return self.get_shapes('vtd2022', url)
+        return self.get_shapes('vtds', 'vtd2022', url)
 
 
     def get_blocks(self):
         url = f'https://www2.census.gov/geo/tiger/TIGER2020/TABBLOCK20/tl_2020_{self.state.fips}_tabblock20.zip'
-        return self.get_shapes('block2020', url)
+        return self.get_shapes('blocks', 'block2020', url)
     
 
     
