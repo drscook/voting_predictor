@@ -388,15 +388,12 @@ select
     div(C.block2020, 1000) as block_group2020,
     div(C.block2010, 10000) as tract2010,
     div(C.block2020, 10000) as tract2020,
-    A.vtd2010,
     G.vtd2020,
     G.county2020,
     {ut.make_select([f'C.aprop2020 * G.{subpop} as {subpop}' for subpop in subpops.keys()])}
 from {tbl_raw} as C
 left join {self.get_geo(block=True)} as G
-using (block2020)
-left join {self.get_assignments(year=2010)} as A
-using (block2010)"""
+using (block2020)"""
             self.qry_to_tbl(qry, tbl)
         return tbl
 
