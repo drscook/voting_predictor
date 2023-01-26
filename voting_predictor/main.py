@@ -413,8 +413,8 @@ using (block2010)"""
             if block:
                 qry = f"""
 select
-    * except (geometry),
-    geometry,
+    * except (S.geometry),
+    S.geometry,
 from (
     select
         *,
