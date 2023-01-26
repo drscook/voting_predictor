@@ -388,7 +388,7 @@ select
     div(C.block2020, 1000) as block_group2020,
     div(C.block2010, 10000) as tract2010,
     div(C.block2020, 10000) as tract2020,
-    G.vtd2020,
+    G.{self.geoid},
     G.county2020,
     {ut.make_select([f'C.aprop2020 * G.{subpop} as {subpop}' for subpop in subpops.keys()])}
 from {tbl_raw} as C
