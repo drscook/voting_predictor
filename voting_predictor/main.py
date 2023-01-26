@@ -430,7 +430,7 @@ from (
             st_perimeter(geometry) / 1000 as perim,
         from {self.get_block()})
     ) as B
-    inner join {self.get_vtd()}) as V
+    inner join {self.get_vtd()} as V
     on st_intersects(B.geometry, V.geometry)
     qualify areaint = max(areaint) over (partition by {geoid})
 ) as S
