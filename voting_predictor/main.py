@@ -585,12 +585,12 @@ using ({geoid})"""
 
     def get_vtd(self):
         url = 'https://data.capitol.texas.gov/dataset/4d8298d0-d176-4c19-b174-42837027b73e/resource/037e1de6-a862-49de-ae31-ae609e214972/download/vtds_22g.zip'
-        return self.get_shapes('vtd', 'vtd2022', url)
+        return self.get_shape('vtd', 'vtd2022', url)
 
 
     def get_block(self):
         url = f'https://www2.census.gov/geo/tiger/TIGER2020/TABBLOCK20/tl_2020_{self.state.fips}_tabblock20.zip'
-        return self.get_shapes('block', 'block2020', url)
+        return self.get_shape('block', 'block2020', url)
     
 
     
