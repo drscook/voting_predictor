@@ -568,35 +568,15 @@ using ({geoid})"""
         tbl = f'shapes.{self.state.abbr}_{attr}{year}'
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
             path, geoid, level, year, decade = self.parse(tbl)
-            attr_raw = attr+'_raw'
-            tbl_raw  = tbl+'_raw'
-            if not self.bq.get_tbl(tbl_raw, overwrite=(attr_raw in self.refresh) & (tbl_raw not in self.tbls)):
-                self.tbls.add(tbl_raw)
-                with Timer():
-                    rpt(tbl)
-                    zip_file = path / url.split('/')[-1]
-                    download(zip_file, url, unzip=False)
-                    d = decade % 100
-                    repl = {'vtdkey':f'vtd{year}', f'geoid{d}':geoid, f'aland{d}': 'aland', f'awater{d}': 'awater', 'geometry':'geometry',}
-                    df = ut.prep(gpd.read_file(zip_file)).rename(columns=repl)
-                    df.geometry = df.geometry.to_crs(CRS['bigquery']).buffer(0).apply(orient, args=(1,))
-                    self.bq.df_to_tbl(df[df.columns.intersection(repl.values())], tbl)
-            qry = f"""
-select
-    * except (geometry),
-    case when perim < 0.1 then 0 else 4 * {np.pi} * atot / (perim * perim) end as polsby_popper,
-    geometry,
-from (
-    select
-        *,
-        st_distance(geometry, (select st_boundary(us_outline_geom) from bigquery-public-data.geo_us_boundaries.national_outline)) as dist_to_border,
-        aland / 1000  / 1000 as aland,
-        awater  / 1000  / 1000 as awater,
-        st_area(geometry) / 1000  / 1000 as atot,
-        st_perimeter(geometry) / 1000 as perim,
-    from
-        {tbl_raw}
-)"""
+            with Timer():
+                rpt(tbl)
+                zip_file = path / url.split('/')[-1]
+                download(zip_file, url, unzip=False)
+                d = decade % 100
+                repl = {'vtdkey':f'vtd{year}', f'geoid{d}':geoid, f'aland{d}': 'aland', f'awater{d}': 'awater', 'geometry':'geometry',}
+                df = ut.prep(gpd.read_file(zip_file)).rename(columns=repl)
+                df.geometry = df.geometry.to_crs(CRS['bigquery']).buffer(0).apply(orient, args=(1,))
+                self.bq.df_to_tbl(df[df.columns.intersection(repl.values())], tbl)
         return tbl
 
 
