@@ -321,8 +321,8 @@ from (
                 self.df_to_tbl(df, tbl)
         return tbl
 
+    
     def get_transformer(self, geoid_src='tract2018'):
-#     def get_transformer(self, year=2018, level='tract'):
         attr = 'transformers'
         tbl = f'{attr}.{self.state.abbr}_{get_decade(geoid_src)}'
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
@@ -402,23 +402,29 @@ using (block2010)"""
             path, geoid, level, year, decade = self.parse(tbl)
             if block:
                 qry = f"""
-select * except (geometry), geometry,
+select
+    * except (geometry),
+    geometry,
 from (
-    select *, case when perim < 0.1 then 0 else 4 * {np.pi} * atot / (perim * perim) end as polsby_popper,
+    select
+        *,
+        case when perim < 0.1 then 0 else 4 * {np.pi} * atot / (perim * perim) end as polsby_popper,
+        st_area(st_intersection(B.geometry, V.geometry)) as areaint,
     from (
         select
-            {geoid},
+            *,
             st_distance(geometry, (select st_boundary(us_outline_geom) from bigquery-public-data.geo_us_boundaries.national_outline)) as dist_to_border,
             aland / 1000  / 1000 as aland,
             awater  / 1000  / 1000 as awater,
             st_area(geometry) / 1000  / 1000 as atot,
             st_perimeter(geometry) / 1000 as perim,
-            geometry,
-        from {self.get_shapes()})
-    ) as S
+        from {self.get_blocks()})
+    ) as B
+    inner join {self.get_vtds()}) as V
+    on st_intersects(B.geometry, V.geometry)
+    qualify areaint = max(areaint) over (partition by {geoid})
+) as S
 join {self.get_pl()} as P
-using ({geoid})
-join {self.get_assignments()} as A
 using ({geoid})"""
                 if self.state.abbr == 'TX':
                     qry += f"""
