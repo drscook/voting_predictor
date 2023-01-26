@@ -112,7 +112,8 @@ class Voting():
         geoid = tbl.split('_')[-1]
         level, year = geoid[:-4], int(geoid[-4:])
         decade = get_decade(year)
-#         geoid = f'{level}{decade}'
+        if level != 'vtd':
+            geoid = f'{level}{decade}'
         return path, geoid, level, year, decade
 
 
