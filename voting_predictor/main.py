@@ -414,7 +414,7 @@ from (
     select
         *,
         case when perim < 0.1 then 0 else 4 * {np.pi} * atot / (perim * perim) end as polsby_popper,
-        st_area(st_intersection(B.geometry, V.geometry)) as areaint,
+        st_area(st_intersection(B.geometry, V.geometry)) / atot as areaint,
     from (
         select
             *,
