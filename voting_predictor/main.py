@@ -7,8 +7,11 @@ warnings.filterwarnings('ignore', message='.*ShapelyDeprecationWarning.*')
 warnings.filterwarnings('ignore', message='.*DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.*')
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
-def get_decade(year):
-    return int(year) // 10 * 10
+def get_decade(x):
+    try:
+        return int(x) // 10 * 10
+    except:
+        return f'{x[:-4]}{get_decade(x[-4:])}'
 
 def rpt(tbl):
     print(f'creating {tbl}', end=ellipsis)
@@ -142,14 +145,13 @@ from (
         and year >= 2015
 )
 group by campaign"""
-            # print(qry)
             campaigns = ut.listify(self.bq.qry_to_df(qry))
 
             L = []
             for campaign, candidates in campaigns:
                 office, year = campaign.split('_')
                 year = min(int(year), datetime.date.today().year-2)
-                A = self.get_acs5_transformed(year=year)
+                A = self.get_acs5_transformed(year)
                 cols1 = ['year', geoid, 'county2020', 'aland', 'awater', 'atot', 'perim', 'polsby_popper']
                 cols2 = sorted(ut.setify(self.bq.get_cols(A)).difference(cols1))
                 cols = cols1 + cols2
@@ -235,9 +237,9 @@ group by 1,2,3,4,5,6,7,8,9"""
         return tbl
 
 
-    def get_acs5_transformed(self, year=2018, overwrite=False):
+    def get_acs5_transformed(self, year=2018):
         attr = 'acs5_transformed'
-        tbl_src  = self.get_acs5(year=year)
+        tbl_src  = self.get_acs5(year)
         path_src, geoid_src, level_src, year_src, decade_src = self.parse(tbl_src)
         tbl = f'{tbl_src}_{self.geoid}'
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
@@ -249,7 +251,7 @@ select
     T.{geoid},
     {ut.make_select([f'sum(S.{x} * T.{x[:x.rfind("_")]}_pop) as {x}' for x in feat if x[:3] != 'all'])},
 from {tbl_src} as S
-inner join {self.get_transformer(year=year_src, level=level_src)} as T
+inner join {self.get_transformer(geoid_src)} as T
 using ({geoid_src})
 group by 1, 2"""
             
@@ -319,9 +321,10 @@ from (
                 self.df_to_tbl(df, tbl)
         return tbl
 
-
-    def get_transformer(self, year=2018, level='tract'):
+    def get_transformer(self, geoid_src='tract2018'):
+#     def get_transformer(self, year=2018, level='tract'):
         attr = 'transformers'
+        geoid_src = f'{geoid_src[:-4]}{get_decade(geoid_src[-4:])}'
         tbl = f'{attr}.{self.state.abbr}_{level}{get_decade(year)}'
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
             path, geoid, level, year, decade = self.parse(tbl)
@@ -395,7 +398,7 @@ using (block2010)"""
             tbl = r+'block2020'
         else:
             attr = 'geo_'+self.level
-            tbl = r+self.level+'2020'
+            tbl = r+self.geoid
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
             path, geoid, level, year, decade = self.parse(tbl)
             if block:
