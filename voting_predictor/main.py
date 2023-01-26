@@ -66,15 +66,20 @@ class Voting():
         self.tbls = set()
         dependencies = {
             'block':'geo_block',
-            self.level:'geo',
+            self.level:'geo_block',
             'pl':'geo_block',
             'plan':'geo_block',
 #             'assignments':{'geo_block', 'crosswalks'},
             'geo_block':{'geo', 'crosswalks'},
             'geo': {'acs5_transformed', 'elections'},
-            'crosswalks_raw':'crosswalks', 'crosswalks': 'transformers', 'transformers':'acs5_transformed',
-            'acs5': 'acs5_transformed','acs5_transformed':'final',
-            'elections_raw': 'elections', 'elections':'final', 'final':set()}
+            'crosswalks_raw':'crosswalks',
+            'crosswalks': 'transformers',
+            'transformers':'acs5_transformed',
+            'acs5': 'acs5_transformed',
+            'acs5_transformed':'final',
+            'elections_raw': 'elections',
+            'elections':'final',
+            'final':set()}
         self.refresh = ut.setify(self.refresh)
         l = 0
         while l < len(self.refresh):
