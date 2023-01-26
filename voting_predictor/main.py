@@ -410,6 +410,7 @@ using (block2010)"""
             tbl = r+self.geoid
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
             path, geoid, level, year, decade = self.parse(tbl)
+            print(tbl, path, geoid, level, year, decade)
             if block:
                 qry = f"""
 select
