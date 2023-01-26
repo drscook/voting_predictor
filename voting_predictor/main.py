@@ -564,23 +564,69 @@ using ({geoid})"""
         return tbl
 
 
-    def get_shapes(self):
-        attr = 'shapes'
-        tbl = f'{attr}.{self.state.abbr}_block2020'
+    def get_shapes(self, attr, year, url):
+        tbl = f'{attr}.{self.state.abbr}_{attr}{year}'
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
             path, geoid, level, year, decade = self.parse(tbl)
             with Timer():
                 rpt(tbl)
-                d = decade % 100
-                zip_file = path / f'tl_{decade}_{self.state.fips}_tabblock{d}.zip'
-                if decade == 2010:
-                    url = f'https://www2.census.gov/geo/tiger/TIGER{decade}/TABBLOCK/{decade}/{zip_file.name}'
-                elif decade == 2020:
-                    url = f'https://www2.census.gov/geo/tiger/TIGER{decade}/TABBLOCK{d}/{zip_file.name}'
+                zip_file = path / url.split('/')[-1]
                 download(zip_file, url, unzip=False)
-
-                repl = {f'geoid{d}':geoid, f'aland{d}': 'aland', f'awater{d}': 'awater', 'geometry':'geometry',}
-                df = ut.prep(gpd.read_file(zip_file)).rename(columns=repl)[repl.values()]
+                d = decade % 100
+                repl = {'vtdkey':f'vtd{year}', f'geoid{d}':geoid, f'aland{d}': 'aland', f'awater{d}': 'awater', 'geometry':'geometry',}
+                df = ut.prep(gpd.read_file(zip_file)).rename(columns=repl)
                 df.geometry = df.geometry.buffer(0).apply(orient, args=(1,))
-                self.bq.df_to_tbl(df, tbl)
+                self.bq.df_to_tbl(df[df.columns.isin(repl.values())], tbl)
         return tbl
+
+
+    def get_vtds(self):
+        url = 'https://data.capitol.texas.gov/dataset/4d8298d0-d176-4c19-b174-42837027b73e/resource/037e1de6-a862-49de-ae31-ae609e214972/download/vtds_22g.zip'
+        return self.get_shapes('vtds', 2022, url)
+
+
+    def get_blocks(self):
+        url = f'https://www2.census.gov/geo/tiger/TIGER2020/TABBLOCK20/tl_2020_{self.state.fips}_tabblock20.zip'
+        return self.get_shapes('blocks', 2020, url)
+    
+
+    
+#     def get_blocks(self):
+#         attr = 'blocks'
+#         tbl = f'{attr}.{self.state.abbr}_{attr}2020'
+#         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
+#             path, geoid, level, year, decade = self.parse(tbl)
+#             with Timer():
+#                 rpt(tbl)
+#                 d = decade % 100
+#                 zip_file = path / f'tl_{decade}_{self.state.fips}_tabblock{d}.zip'
+#                 if decade == 2010:
+#                     url = f'https://www2.census.gov/geo/tiger/TIGER{decade}/TABBLOCK/{decade}/{zip_file.name}'
+#                 elif decade == 2020:
+#                     url = f'https://www2.census.gov/geo/tiger/TIGER{decade}/TABBLOCK{d}/{zip_file.name}'
+#                 download(zip_file, url, unzip=False)
+
+#                 repl = {f'geoid{d}':geoid, f'aland{d}': 'aland', f'awater{d}': 'awater', 'geometry':'geometry',}
+#                 df = ut.prep(gpd.read_file(zip_file)).rename(columns=repl)[repl.values()]
+#                 df.geometry = df.geometry.buffer(0).apply(orient, args=(1,))
+#                 self.bq.df_to_tbl(df, tbl)
+#         return tbl
+
+    
+#     def get_vtds(self):
+#         attr = 'vtds'
+#         tbl = f'{attr}.{self.state.abbr}_{attr}2020'
+#         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
+#             path, geoid, level, year, decade = self.parse(tbl)
+#             with Timer():
+#                 rpt(tbl)
+#                 d = decade % 100
+#                 zip_file = path / f'vtds_{d}g.zip'
+#                 url = f'https://data.capitol.texas.gov/dataset/4d8298d0-d176-4c19-b174-42837027b73e/resource/037e1de6-a862-49de-ae31-ae609e214972/download/{zip_file.name}'
+#                 download(zip_file, url, unzip=False)
+
+#                 repl = {'vtdkey':f'vtd{year}', 'geometry':'geometry'}
+#                 df = ut.prep(gpd.read_file(zip_file)).rename(columns=repl)[repl.values()]
+#                 df.geometry = df.geometry.buffer(0).apply(orient, args=(1,))
+#                 self.bq.df_to_tbl(df, tbl)
+#         return tbl
