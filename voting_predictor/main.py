@@ -434,12 +434,16 @@ from (
     on st_intersects(B.geometry, V.geometry)
     qualify areaint = max(areaint) over (partition by {geoid})
 ) as S
-join {self.get_pl()} as P
-using ({geoid})"""
+inner join
+    {self.get_pl()} as P
+using
+    ({geoid})"""
                 if self.state.abbr == 'TX':
                     qry += f"""
-join {self.get_plan()} as B
-using ({geoid})"""
+inner join
+    {self.get_plan()} as B
+using
+    ({geoid})"""
 
             else:
                 tbl_raw = self.get_geo(block=True)
