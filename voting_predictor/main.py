@@ -579,7 +579,7 @@ using ({geoid})"""
                 repl = {'vtdkey':f'vtd{year}', f'geoid{d}':geoid, f'aland{d}': 'aland', f'awater{d}': 'awater', 'geometry':'geometry',}
                 df = ut.prep(gpd.read_file(zip_file)).rename(columns=repl)
                 df.geometry = df.geometry.to_crs(CRS['bigquery']).buffer(0).apply(orient, args=(1,))
-                self.df_to_tbl(df, tbl, cols=repl.values()))
+                self.df_to_tbl(df, tbl, cols=repl.values())
         return tbl
 
 
