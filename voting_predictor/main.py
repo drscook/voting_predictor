@@ -445,7 +445,6 @@ using ({geoid})"""
 
             else:
                 tbl_raw = self.get_geo(block=True)
-                print(tbl, path, geoid, level, year, decade)
                 geo_cols = [geoid, 'dist_to_border', 'aland', 'awater', 'atot', 'perim', 'polsby_popper', 'geometry']
                 pop_cols = ['all_tot_pop', 'all_vap_pop', 'white_tot_pop', 'white_vap_pop', 'hisp_tot_pop', 'hisp_vap_pop', 'other_tot_pop', 'other_vap_pop']
                 exclude_cols = ['block2020']
@@ -485,7 +484,7 @@ join (
     qualify row_number() over (partition by {geoid} order by all_tot_pop desc) = 1
 ) as D
 using ({geoid})"""
-            self.qry_to_tbl(qry, tbl, True)
+            self.qry_to_tbl(qry, tbl)
         return tbl
 
 
