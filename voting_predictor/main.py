@@ -482,7 +482,7 @@ join (
     qualify row_number() over (partition by {geoid} order by all_tot_pop desc) = 1
 ) as D
 using ({geoid})"""
-            self.qry_to_tbl(qry, tbl)
+            self.qry_to_tbl(qry, tbl, True)
         return tbl
 
 
