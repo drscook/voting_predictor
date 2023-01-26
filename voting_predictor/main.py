@@ -104,6 +104,15 @@ class Voting():
         return path, geoid, level, year, decade
 
 
+    def run_qry(self, qry, tbl, show=False):
+        with Timer():
+            rpt(tbl)
+            if show:
+                print(qry)
+            self.bq.qry_to_tbl(qry, tbl)
+            self.tbls.add(tbl)
+
+
     def get_final(self):
         attr = 'final'
         if (self.state.abbr != 'TX') or (self.level != 'vtd'):
