@@ -324,8 +324,7 @@ from (
     def get_transformer(self, geoid_src='tract2018'):
 #     def get_transformer(self, year=2018, level='tract'):
         attr = 'transformers'
-        geoid_src = f'{geoid_src[:-4]}{get_decade(geoid_src[-4:])}'
-        tbl = f'{attr}.{self.state.abbr}_{level}{get_decade(year)}'
+        tbl = f'{attr}.{self.state.abbr}_{get_decade(geoid_src)}'
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
             path, geoid, level, year, decade = self.parse(tbl)
             g = geoid+', ' if year<2020 else ''
