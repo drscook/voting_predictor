@@ -109,10 +109,10 @@ class Voting():
     def parse(self, tbl):
         attr = tbl.split('.')[0]
         path = self.data_path / attr
-        g = tbl.split('_')[-1]
-        level, year = g[:-4], int(g[-4:])
+        geoid = tbl.split('_')[-1]
+        level, year = geoid[:-4], int(geoid[-4:])
         decade = get_decade(year)
-        geoid = f'{level}{decade}'
+#         geoid = f'{level}{decade}'
         return path, geoid, level, year, decade
 
 
