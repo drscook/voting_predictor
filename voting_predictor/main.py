@@ -574,7 +574,7 @@ using ({geoid})"""
                 download(zip_file, url, unzip=False)
                 d = decade % 100
                 repl = {'vtdkey':f'vtd{year}', f'geoid{d}':geoid, f'aland{d}': 'aland', f'awater{d}': 'awater', 'geometry':'geometry',}
-                df = ut.prep(gpd.read_file(zip_file)).rename(columns=repl)
+                df = ut.prep(gpd.read_file(zip_file)).rename(columns=repl).to_crs(CRS['bigquery'])
                 df.geometry = df.geometry.buffer(0).apply(orient, args=(1,))
                 self.bq.df_to_tbl(df[df.columns.intersection(repl.values())], tbl)
         return tbl
