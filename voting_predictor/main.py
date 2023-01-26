@@ -65,11 +65,13 @@ class Voting():
         self.state = us.states.lookup(self.state)
         self.tbls = set()
         dependencies = {
-            
-            
-            
-            'blocks':'geo_raw', 'pl':'geo_raw', 'plans':'geo_raw', 'assignments':{'geo_raw', 'crosswalks'},
-            'geo_raw':{'geo', 'crosswalks'}, 'geo': {'acs5_transformed', 'elections'},
+            'block':'geo_block',
+            'vtd':'geo_vtd',
+            'pl':'geo_block',
+            'plan':'geo_block',
+#             'assignments':{'geo_block', 'crosswalks'},
+            'geo_block':{'geo', 'crosswalks'},
+            'geo': {'acs5_transformed', 'elections'},
             'crosswalks_raw':'crosswalks', 'crosswalks': 'transformers', 'transformers':'acs5_transformed',
             'acs5': 'acs5_transformed','acs5_transformed':'final',
             'elections_raw': 'elections', 'elections':'final', 'final':set()}
@@ -140,7 +142,7 @@ from (
         office||"_"||year as campaign,
         name||"_"||party as candidate,
         party,
-    from {self.get_elections()}
+    from {self.get_election()}
     where
         office in ("Governor", "USSen", "President", "Comptroller", "AttorneyGen", "LtGovernor")
         and election = "general"
@@ -169,7 +171,7 @@ select
 from {A} as A
 left join (
     select {geoid}, party, votes,
-    from {self.get_elections()}
+    from {self.get_election()}
     where office = "{office}" and year = {year})
     pivot(sum(votes) for party in ("D", "R")
 ) as B
@@ -189,10 +191,10 @@ from (
         return tbl
     
     
-    def get_elections(self):
+    def get_election(self):
         if (self.state.abbr != 'TX') or (self.level != 'vtd'):
             return False
-        attr = 'elections'
+        attr = 'election'
         tbl = f'{attr}.{self.state.abbr}_{self.geoid}'
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
             path, geoid, level, year, decade = self.parse(tbl)
@@ -326,7 +328,7 @@ from (
 
     
     def get_transformer(self, geoid_src='tract2018'):
-        attr = 'transformers'
+        attr = 'transformer'
         tbl = f'{attr}.{self.state.abbr}_{get_decade(geoid_src)}'
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
             path, geoid, level, year, decade = self.parse(tbl)
@@ -340,10 +342,10 @@ select
     A.vtd2020,
     A.county2020,
     {ut.make_select([f'sum(case when B.{x} = 0 then 0 else A.{x} / B.{x} end) as {x}' for x in subpops.keys()])},
-from {self.get_crosswalks()} as A
+from {self.get_crosswalk()} as A
 inner join (
     select {geoid}, {ut.make_select([f'sum({x}) as {x}' for x in subpops.keys()], 2)},
-    from {self.get_crosswalks()}
+    from {self.get_crosswalk()}
     group by {geoid}
 ) as B
 using ({geoid})
@@ -352,8 +354,8 @@ group by {g}block2020, block_group2020, tract2020, vtd2020, county2020"""
         return tbl
 
 
-    def get_crosswalks(self):
-        attr = 'crosswalks'
+    def get_crosswalk(self):
+        attr = 'crosswalk'
         tbl = f'{attr}.{self.state.abbr}_block2020'
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
             path, geoid, level, year, decade = self.parse(tbl)
@@ -396,10 +398,10 @@ using (block2010)"""
     def get_geo(self, block=False):
         r = f'geo.{self.state.abbr}_'
         if block:
-            attr = 'geo_blocks'
+            attr = 'geo_block'
             tbl = r+'block2020'
         else:
-            attr = 'geo_'+self.level
+            attr = 'geo'
             tbl = r+self.geoid
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
             path, geoid, level, year, decade = self.parse(tbl)
@@ -421,9 +423,9 @@ from (
             awater  / 1000  / 1000 as awater,
             st_area(geometry) / 1000  / 1000 as atot,
             st_perimeter(geometry) / 1000 as perim,
-        from {self.get_blocks()})
+        from {self.get_block()})
     ) as B
-    inner join {self.get_vtds()}) as V
+    inner join {self.get_vtd()}) as V
     on st_intersects(B.geometry, V.geometry)
     qualify areaint = max(areaint) over (partition by {geoid})
 ) as S
@@ -431,7 +433,7 @@ join {self.get_pl()} as P
 using ({geoid})"""
                 if self.state.abbr == 'TX':
                     qry += f"""
-join {self.get_plans()} as B
+join {self.get_plan()} as B
 using ({geoid})"""
 
             else:
@@ -479,10 +481,10 @@ using ({geoid})"""
         return tbl
 
 
-    def get_plans(self):
+    def get_plan(self):
         if self.state.abbr != 'TX':
             return False
-        attr = 'plans'
+        attr = 'plan'
         tbl = f'{attr}.{self.state.abbr}_block2020'
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
             path, geoid, level, year, decade = self.parse(tbl)
@@ -565,8 +567,8 @@ using ({geoid})"""
         return tbl
 
 
-    def get_shapes(self, attr, geoid, url):
-        tbl = f'shapes.{self.state.abbr}_{geoid}'
+    def get_shape(self, attr, geoid, url):
+        tbl = f'shape.{self.state.abbr}_{geoid}'
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
             path, geoid, level, year, decade = self.parse(tbl)
             with Timer():
@@ -581,14 +583,14 @@ using ({geoid})"""
         return tbl
 
 
-    def get_vtds(self):
+    def get_vtd(self):
         url = 'https://data.capitol.texas.gov/dataset/4d8298d0-d176-4c19-b174-42837027b73e/resource/037e1de6-a862-49de-ae31-ae609e214972/download/vtds_22g.zip'
-        return self.get_shapes('vtds', 'vtd2022', url)
+        return self.get_shapes('vtd', 'vtd2022', url)
 
 
-    def get_blocks(self):
+    def get_block(self):
         url = f'https://www2.census.gov/geo/tiger/TIGER2020/TABBLOCK20/tl_2020_{self.state.fips}_tabblock20.zip'
-        return self.get_shapes('blocks', 'block2020', url)
+        return self.get_shapes('block', 'block2020', url)
     
 
     
