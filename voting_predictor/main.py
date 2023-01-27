@@ -227,7 +227,7 @@ from (
                             df['incumbent'] = df['incumbent'] == 'Y'
                             L.append(df.loc[mask, cols])
                 df = ut.prep(pd.concat(L, axis=0)).reset_index(drop=True)
-                self.df_to_tbl(df, tbl_raw)
+                self.df_to_tbl(df, tbl)
                             
                     
                     
