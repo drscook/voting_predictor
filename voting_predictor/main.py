@@ -127,8 +127,9 @@ class Voting():
             
     
     def df_to_tbl(self, df, tbl, cols=None):
-        cols = ut.listify(cols) if cols else df.columns
-        self.bq.df_to_tbl(ut.prep(df[df.columns.intersection(cols)]), tbl)
+        cols = cols if cols else df.columns
+        cols = [x for x in ut.listify(cols) if x in df.columns]
+        self.bq.df_to_tbl(ut.prep(df[cols]), tbl)
         self.tbls.add(tbl)
 
 
