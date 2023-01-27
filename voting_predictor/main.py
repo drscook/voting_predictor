@@ -411,17 +411,16 @@ using (block2020)"""
             if block:
                 qry = f"""
 select
-    {geoid},
-    P.county,
-    S.* except (geometry),
-    P.* except (county),
+    P.*,
+    S.* except ({geoid}, geometry),
     geometry,
 from (
     select
         V.{self.geoid},
-        B.*,
+        B.* except (geometry),
         case when perim < 0.1 then 0 else 4 * {np.pi} * atot / (perim * perim) end as polsby_popper,
         st_area(st_intersection(B.geometry, V.geometry)) / atot as areaint,
+        geometry,
     from (
         select
             {geoid},
