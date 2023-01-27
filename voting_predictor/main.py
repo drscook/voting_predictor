@@ -570,7 +570,9 @@ using ({geoid})"""
                 df = self.fetch_census(fields=['name', *repl.keys()], dataset='pl', year=year, level='block').rename(columns=repl)
                 compute_other(df, 'tot_pop')
                 compute_other(df, 'vap_pop')
-                df.insert(1, 'county', df['name'].str.split(', ', expand=True)[3].str[:-7])
+                county = df['name'].str.split(', ', expand=True)[3].str[:-7]
+                print(county.head(3))
+                df.insert(1, 'county', county)
                 print(df.columns)
 #                 df['county'] = df['name'].str.split(', ', expand=True)[3].str[:-7]
                 self.df_to_tbl(df, tbl, cols=[geoid, *subpops.keys(), 'county'])
