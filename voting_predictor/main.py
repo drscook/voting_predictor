@@ -74,7 +74,7 @@ class Voting():
             'crosswalk_raw':'crosswalk',
             'crosswalk': 'transformer',
             'transformer':'acs5_transformed',
-            'acs5': 'acs5_transformed',
+            'acs5':'acs5_transformed',
             'acs5_transformed':'final',
             'election':'final',
             'final':set()}
@@ -139,9 +139,7 @@ class Voting():
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
             path, geoid, level, year, decade = self.parse(tbl)
             qry = f"""
-select
-    campaign,
-    string_agg(candidate, " v " order by party) as candidates
+select campaign, string_agg(candidate, " v " order by party) as candidates,
 from (
     select distinct
         office||"_"||year as campaign,
@@ -150,11 +148,8 @@ from (
     from {self.get_election()}
     where
         office in ("Governor", "USSen", "President", "Comptroller", "AttorneyGen", "LtGovernor")
-        and election = "general"
-        and party in ("D", "R")
-        and year >= 2015
-)
-group by campaign"""
+        and election = "general" and party in ("D", "R") and year >= 2015
+) group by campaign"""
             campaigns = ut.listify(self.bq.qry_to_df(qry))
 
             L = []
@@ -188,8 +183,7 @@ select
     case when tot_votes = 0  then 0 else dem_votes / tot_votes end as dem_prop,
     case when tot_votes = 0  then 0 else rep_votes / tot_votes end as rep_prop,
 from (
-    {ut.subquery(qry)}
-)"""
+    {ut.subquery(qry)})"""
                 L.append(qry)   
             qry = ut.join(L, '\nunion all\n')
             self.qry_to_tbl(qry, tbl)
@@ -278,16 +272,14 @@ select
     {ut.make_select([f'case when {den(x)} = 0 then 0 else {x} / {den(x)} end as {x}_prop' for x in feat])},
     {ut.make_select([f'case when aland = 0 then 0 else {x} / aland end as {x}_dens' for x in subpops.keys()])},
 from (
-    {ut.subquery(qry)}
-)"""
+    {ut.subquery(qry)})"""
             
             qry = f"""
 select
     *,
     {ut.make_select([f'{x} / max({x}) over () as {x}_rel' for x in ['dist_to_border', *[f'{x}_dens' for x in subpops.keys()]]])},
 from (
-    {ut.subquery(qry)}
-)"""
+    {ut.subquery(qry)})"""
             self.qry_to_tbl(qry, tbl)
         return tbl
 
