@@ -164,7 +164,7 @@ group by campaign"""
                 office, year = campaign.split('_')
                 year = min(int(year), datetime.date.today().year-2)
                 A = self.get_acs5_transformed(year)
-                cols1 = ['year', geoid, 'county2020', 'aland', 'awater', 'atot', 'perim', 'polsby_popper']
+                cols1 = ['year', geoid, 'county', 'aland', 'awater', 'atot', 'perim', 'polsby_popper']
                 cols2 = sorted(ut.setify(self.bq.get_cols(A)).difference(cols1))
                 cols = cols1 + cols2
                 qry = f"""
@@ -215,15 +215,15 @@ from (
                     download(zip_file, url)
 
                     L = []
-                    cols = ['vtd2020', 'county2020', 'fips', 'office', 'year', 'election', 'name', 'party', 'incumbent', 'votes']                    
+                    cols = ['vtd2022', 'county', 'fips', 'office', 'year', 'election', 'name', 'party', 'incumbent', 'votes']                    
                     for file in path.iterdir():
                         a = ut.prep(file.stem.split('_'))
                         if a[-1] == 'returns':
-                            df = ut.prep(pd.read_csv(file)).rename(columns={'vtd':'vtd2020', 'county':'county2020'})
+                            df = ut.prep(pd.read_csv(file))
                             mask = (df['votes'] > 0) & (df['party'].isin(('R', 'D', 'L', 'G')))
                             if mask.any():
                                 repl = {(' ', '.', ','): ''}
-                                df['vtd2020'] = ut.rjust(df['vtd2020'], 6)
+                                df['vtd2022'] = ut.rjust(df['vtd'], 6)
                                 df['fips'] = self.state.fips + ut.rjust(df['fips'], 3)
                                 df['office'] = ut.replace(df['office'], repl)
                                 df['year'] = int(a[0])
@@ -235,7 +235,7 @@ from (
                     self.df_to_tbl(df, tbl_raw)
             qry = f"""
 select
-    coalesce(B.vtd2020, C.vtd2020) as vtd2020,
+    coalesce(B.vtd2022, C.vtd2022) as vtd2022,
     A.* except (vtd2020, votes),
     sum(A.votes) as votes,
     sum(coalesce(B.all_tot_pop, C.all_tot_pop)) as all_tot_pop,
@@ -270,7 +270,7 @@ group by 1, 2"""
             qry = f"""
 select
     A.*,
-    G.county2020,
+    G.county,
     G.dist_to_border,
     G.aland,
     G.awater,
@@ -346,8 +346,8 @@ select
     A.block2020,
     A.block_group2020,
     A.tract2020,
-    A.vtd2020,
-    A.county2020,
+    A.vtd2022,
+    A.county,
     {ut.make_select([f'sum(case when B.{x} = 0 then 0 else A.{x} / B.{x} end) as {x}' for x in subpops.keys()])},
 from {self.get_crosswalk()} as A
 inner join (
@@ -356,7 +356,7 @@ inner join (
     group by {geoid}
 ) as B
 using ({geoid})
-group by {g}block2020, block_group2020, tract2020, vtd2020, county2020"""
+group by {g}block2020, block_group2020, tract2020, vtd2022, county"""
             self.qry_to_tbl(qry, tbl)
         return tbl
 
@@ -390,7 +390,7 @@ select
     div(C.block2010, 10000) as tract2010,
     div(C.block2020, 10000) as tract2020,
     G.{self.geoid},
-    G.county2020,
+    G.county,
     {ut.make_select([f'C.aprop2020 * G.{subpop} as {subpop}' for subpop in subpops.keys()])}
 from {tbl_raw} as C
 left join {self.get_geo(block=True)} as G
