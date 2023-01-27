@@ -69,7 +69,6 @@ class Voting():
             self.level:'geo_block',
             'pl':'geo_block',
             'plan':'geo_block',
-#             'assignment':{'geo_block', 'crosswalk'},
             'geo_block':{'geo', 'crosswalk'},
             'geo': 'acs5_transformed',
             'crosswalk_raw':'crosswalk',
@@ -228,42 +227,6 @@ from (
                 df = ut.prep(pd.concat(L, axis=0)).reset_index(drop=True)
                 self.df_to_tbl(df, tbl)
         return tbl
-                            
-                    
-                    
-                    
-#                     cols = ['vtd2022', 'county', 'fips', 'office', 'year', 'election', 'name', 'party', 'incumbent', 'votes']                    
-#                     for file in path.iterdir():
-#                         a = ut.prep(file.stem.split('_'))
-#                         if a[-1] == 'returns':
-#                             df = ut.prep(pd.read_csv(file))
-#                             mask = (df['votes'] > 0) & (df['party'].isin(('R', 'D', 'L', 'G')))
-#                             if mask.any():
-#                                 repl = {(' ', '.', ','): ''}
-# #                                 df['vtd2022'] = ut.rjust(df['vtd'], 6)
-# #                                 df['fips'] = self.state.fips + ut.rjust(df['fips'], 3)
-#                                 df['office'] = ut.replace(df['office'], repl)
-#                                 df['year'] = int(a[0])
-#                                 df['election'] = ut.join(a[1:-2], '_')
-#                                 df['name'] = ut.replace(df['name'], repl)
-#                                 df['incumbent'] = df['incumbent'] == 'Y'
-#                                 L.append(df.loc[mask, cols])
-#                     df = ut.prep(pd.concat(L, axis=0)).reset_index(drop=True)
-#                     self.df_to_tbl(df, tbl_raw)
-#             qry = f"""
-# select
-#     coalesce(B.vtd2022, C.vtd2022) as vtd2022,
-#     A.* except (vtd2020, votes),
-#     sum(A.votes) as votes,
-#     sum(coalesce(B.all_tot_pop, C.all_tot_pop)) as all_tot_pop,
-# from {tbl_raw} as A
-# left join {self.get_geo()} as B
-# on A.fips || A.vtd2020 = B.vtd2020
-# left join {self.get_geo()} as C
-# on A.fips || '0' || left(A.vtd2020, 5) = C.vtd2020
-# group by 1,2,3,4,5,6,7,8,9"""
-#             self.qry_to_tbl(qry, tbl)
-#         return tbl
 
 
     def get_acs5_transformed(self, year=2018):
@@ -406,7 +369,7 @@ select
     div(C.block2020, 1000) as block_group2020,
     div(C.block2010, 10000) as tract2010,
     div(C.block2020, 10000) as tract2020,
-    G.{self.geoid},
+    G.vtd2022,
     G.county,
     {ut.make_select([f'C.aprop2020 * G.{subpop} as {subpop}' for subpop in subpops.keys()])}
 from {tbl_raw} as C
@@ -545,35 +508,6 @@ using ({geoid})"""
                             L.append(df)
                 self.df_to_tbl(pd.concat(L, axis=1), tbl)
         return tbl
-
-
-#     def get_assignments(self, year=2020):
-#         attr = 'assignments'
-#         tbl = f'{attr}.{self.state.abbr}_block{get_decade(year)}'
-#         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
-#             path, geoid, level, year, decade = self.parse(tbl)
-#             with Timer():
-#                 rpt(tbl)
-#                 zip_file = path / f'BlockAssign_ST{self.state.fips}_{self.state.abbr}.zip'
-#                 if decade == 2010:
-#                     url = f'https://www2.census.gov/geo/docs/maps-data/data/baf/{zip_file.name}'
-#                 elif decade == 2020:
-#                     url = f'https://www2.census.gov/geo/docs/maps-data/data/baf{decade}/{zip_file.name}'
-#                 download(zip_file, url)
-
-#                 dist = {'VTD':f'vtd{decade}', 'CD':f'congress{decade-10}', 'SLDU':f'senate{decade-10}', 'SLDL':f'house{decade-10}'}
-#                 L = []
-#                 for abbr, name in dist.items():
-#                     f = zip_file.parent / f'{zip_file.stem}_{abbr}.txt'
-#                     df = ut.prep(pd.read_csv(f, sep='|'))
-#                     if abbr == 'VTD':
-#                         # create vtd id using 3 fips + 6 vtd, pad on left with 0 as needed
-#                         df['district'] = self.state.fips + ut.rjust(df['countyfp'], 3) + ut.rjust(df['district'], 6)
-#                     repl = {'blockid': geoid, 'district':name}
-#                     L.append(df.rename(columns=repl)[repl.values()].set_index(geoid))
-#                 df = pd.concat(L, axis=1)
-#                 self.bq.df_to_tbl(df, tbl)
-#         return tbl
 
 
     def get_pl(self):
