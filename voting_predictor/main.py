@@ -205,47 +205,30 @@ from (
         tbl = f'{attr}.{self.state.abbr}_{self.geoid}'
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
             path, geoid, level, year, decade = self.parse(tbl)
-            attr_raw = attr+'_raw'
-            tbl_raw  = tbl+'_raw'
-            if not self.bq.get_tbl(tbl_raw, overwrite=(attr_raw in self.refresh) & (tbl_raw not in self.tbls)):
-                with Timer():
-                    rpt(tbl_raw)
-                    zip_file = path / f'2022-general-vtds-election-data.zip'                
-                    url = f'https://data.capitol.texas.gov/dataset/35b16aee-0bb0-4866-b1ec-859f1f044241/resource/b9ebdbdb-3e31-4c98-b158-0e2993b05efc/download/{zip_file.name}'
-                    download(zip_file, url)
+            with Timer():
+                rpt(tbl)
+                zip_file = path / f'2022-general-vtds-election-data.zip'                
+                url = f'https://data.capitol.texas.gov/dataset/35b16aee-0bb0-4866-b1ec-859f1f044241/resource/b9ebdbdb-3e31-4c98-b158-0e2993b05efc/download/{zip_file.name}'
+                download(zip_file, url)
 
-                    L = []
-                    cols = ['vtd2022', 'office', 'year', 'election', 'name', 'party', 'incumbent', 'votes']                    
-                    for file in path.iterdir():
-                        a = ut.prep(file.stem.split('_'))
-                        if a[-1] == 'returns':
-                            df = ut.prep(pd.read_csv(file)).rename(columns={'vtdkeyvalue':'vtd2022'})
-                            mask = (df['votes'] > 0) & (df['party'].isin(('R', 'D', 'L', 'G')))
-                            if mask.any():
-                                repl = {(' ', '.', ','): ''}
-                                df['office'] = ut.replace(df['office'], repl)
-                                df['year'] = int(a[0])
-                                df['election'] = ut.join(a[1:-2], '_')
-                                df['name'] = ut.replace(df['name'], repl)
-                                df['incumbent'] = df['incumbent'] == 'Y'
-                                L.append(df.loc[mask, cols])
-                    df = ut.prep(pd.concat(L, axis=0)).reset_index(drop=True)
-                    self.df_to_tbl(df, tbl_raw)
-            qry = f"""
-select
-    coalesce(B.vtd2022, C.vtd2022) as vtd2022,
-    A.* except (vtd2020, votes),
-    sum(A.votes) as votes,
-    sum(coalesce(B.all_tot_pop, C.all_tot_pop)) as all_tot_pop,
-from {tbl_raw} as A
-left join {self.get_geo()} as B
-on A.fips || A.vtd2020 = B.vtd2020
-left join {self.get_geo()} as C
-on A.fips || '0' || left(A.vtd2020, 5) = C.vtd2020
-group by 1,2,3,4,5,6,7,8,9"""
-            self.qry_to_tbl(qry, tbl)
-        return tbl
-
+                L = []
+                cols = [self.geoid, 'office', 'year', 'election', 'name', 'party', 'incumbent', 'votes']                    
+                for file in path.iterdir():
+                    a = ut.prep(file.stem.split('_'))
+                    if a[-1] == 'returns':
+                        df = ut.prep(pd.read_csv(file)).rename(columns={'vtdkeyvalue':self.geoid})
+                        ut.pprint(df.head(3))
+                        mask = (df['votes'] > 0) & (df['party'].isin(('R', 'D', 'L', 'G')))
+                        if mask.any():
+                            repl = {(' ', '.', ','): ''}
+                            df['office'] = ut.replace(df['office'], repl)
+                            df['year'] = int(a[0])
+                            df['election'] = ut.join(a[1:-2], '_')
+                            df['name'] = ut.replace(df['name'], repl)
+                            df['incumbent'] = df['incumbent'] == 'Y'
+                            L.append(df.loc[mask, cols])
+                df = ut.prep(pd.concat(L, axis=0)).reset_index(drop=True)
+                self.df_to_tbl(df, tbl_raw)
                             
                     
                     
