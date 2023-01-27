@@ -71,13 +71,12 @@ class Voting():
             'plan':'geo_block',
 #             'assignment':{'geo_block', 'crosswalk'},
             'geo_block':{'geo', 'crosswalk'},
-            'geo': {'acs5_transformed', 'election'},
+            'geo': 'acs5_transformed',
             'crosswalk_raw':'crosswalk',
             'crosswalk': 'transformer',
             'transformer':'acs5_transformed',
             'acs5': 'acs5_transformed',
             'acs5_transformed':'final',
-            'election_raw': 'election',
             'election':'final',
             'final':set()}
         self.refresh = ut.setify(self.refresh)
@@ -228,6 +227,7 @@ from (
                             L.append(df.loc[mask, cols])
                 df = ut.prep(pd.concat(L, axis=0)).reset_index(drop=True)
                 self.df_to_tbl(df, tbl)
+        return tbl
                             
                     
                     
