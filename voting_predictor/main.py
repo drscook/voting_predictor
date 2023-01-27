@@ -571,11 +571,8 @@ using ({geoid})"""
                 compute_other(df, 'tot_pop')
                 compute_other(df, 'vap_pop')
                 county = df['name'].str.split(', ', expand=True)[3].str[:-7]
-                print(county.head(3))
-                df.insert(1, 'county', county)
-                print(df.columns)
-#                 df['county'] = df['name'].str.split(', ', expand=True)[3].str[:-7]
-                self.df_to_tbl(df, tbl, cols=[geoid, *subpops.keys(), 'county'])
+                df['county'] = df['name'].str.split(', ', expand=True)[3].str[:-7]
+                self.df_to_tbl(df, tbl, cols=[geoid, 'county', *subpops.keys()])
         return tbl
 
 
