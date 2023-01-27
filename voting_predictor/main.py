@@ -528,7 +528,7 @@ using ({geoid})"""
                 zip_file = path / url.split('/')[-1]
                 download(zip_file, url, unzip=False)
                 d = decade % 100
-                repl = {'vtdkey':f'vtd{year}', f'geoid{d}':geoid, f'aland{d}': 'aland', f'awater{d}': 'awater', 'geometry':'geometry',}
+                repl = {'vtdkey':f'vtd{year}', f'geoid{d}':f'block{year}', f'aland{d}': 'aland', f'awater{d}': 'awater', 'geometry':'geometry',}
                 df = ut.prep(gpd.read_file(zip_file)).rename(columns=repl)
                 df.geometry = df.geometry.to_crs(CRS['bigquery']).buffer(0).apply(orient, args=(1,))
                 self.df_to_tbl(df, tbl, cols=repl.values())
