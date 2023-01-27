@@ -215,6 +215,7 @@ from (
                 cols = [self.geoid, 'office', 'year', 'election', 'name', 'party', 'incumbent', 'votes']                    
                 for file in path.iterdir():
                     a = ut.prep(file.stem.split('_'))
+                    print(a)
                     if a[-1] == 'returns':
                         df = ut.prep(pd.read_csv(file)).rename(columns={'vtdkeyvalue':self.geoid})
                         ut.pprint(df.head(3))
