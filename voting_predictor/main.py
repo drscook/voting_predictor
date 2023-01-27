@@ -215,16 +215,14 @@ from (
                     download(zip_file, url)
 
                     L = []
-                    cols = ['vtd2022', 'county', 'fips', 'office', 'year', 'election', 'name', 'party', 'incumbent', 'votes']                    
+                    cols = ['vtd2022', 'office', 'year', 'election', 'name', 'party', 'incumbent', 'votes']                    
                     for file in path.iterdir():
                         a = ut.prep(file.stem.split('_'))
                         if a[-1] == 'returns':
-                            df = ut.prep(pd.read_csv(file))
+                            df = ut.prep(pd.read_csv(file)).rename(columns={'vtdkeyvalue':'vtd2022'})
                             mask = (df['votes'] > 0) & (df['party'].isin(('R', 'D', 'L', 'G')))
                             if mask.any():
                                 repl = {(' ', '.', ','): ''}
-                                df['vtd2022'] = ut.rjust(df['vtd'], 6)
-                                df['fips'] = self.state.fips + ut.rjust(df['fips'], 3)
                                 df['office'] = ut.replace(df['office'], repl)
                                 df['year'] = int(a[0])
                                 df['election'] = ut.join(a[1:-2], '_')
@@ -247,6 +245,43 @@ on A.fips || '0' || left(A.vtd2020, 5) = C.vtd2020
 group by 1,2,3,4,5,6,7,8,9"""
             self.qry_to_tbl(qry, tbl)
         return tbl
+
+                            
+                    
+                    
+                    
+#                     cols = ['vtd2022', 'county', 'fips', 'office', 'year', 'election', 'name', 'party', 'incumbent', 'votes']                    
+#                     for file in path.iterdir():
+#                         a = ut.prep(file.stem.split('_'))
+#                         if a[-1] == 'returns':
+#                             df = ut.prep(pd.read_csv(file))
+#                             mask = (df['votes'] > 0) & (df['party'].isin(('R', 'D', 'L', 'G')))
+#                             if mask.any():
+#                                 repl = {(' ', '.', ','): ''}
+# #                                 df['vtd2022'] = ut.rjust(df['vtd'], 6)
+# #                                 df['fips'] = self.state.fips + ut.rjust(df['fips'], 3)
+#                                 df['office'] = ut.replace(df['office'], repl)
+#                                 df['year'] = int(a[0])
+#                                 df['election'] = ut.join(a[1:-2], '_')
+#                                 df['name'] = ut.replace(df['name'], repl)
+#                                 df['incumbent'] = df['incumbent'] == 'Y'
+#                                 L.append(df.loc[mask, cols])
+#                     df = ut.prep(pd.concat(L, axis=0)).reset_index(drop=True)
+#                     self.df_to_tbl(df, tbl_raw)
+#             qry = f"""
+# select
+#     coalesce(B.vtd2022, C.vtd2022) as vtd2022,
+#     A.* except (vtd2020, votes),
+#     sum(A.votes) as votes,
+#     sum(coalesce(B.all_tot_pop, C.all_tot_pop)) as all_tot_pop,
+# from {tbl_raw} as A
+# left join {self.get_geo()} as B
+# on A.fips || A.vtd2020 = B.vtd2020
+# left join {self.get_geo()} as C
+# on A.fips || '0' || left(A.vtd2020, 5) = C.vtd2020
+# group by 1,2,3,4,5,6,7,8,9"""
+#             self.qry_to_tbl(qry, tbl)
+#         return tbl
 
 
     def get_acs5_transformed(self, year=2018):
