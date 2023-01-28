@@ -504,7 +504,7 @@ from (
         st_perimeter(geometry) / 1000 as perim,
     from {tbl_raw})"""
             self.qry_to_tbl(qry, tbl)
-            self.bq.del_tbl(tbl_raw)
+#             self.bq.del_tbl(tbl_raw)
         return tbl
 
 
