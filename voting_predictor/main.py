@@ -71,7 +71,6 @@ class Voting():
             'plan':'geo_block',
             'geo_block':{'geo', 'crosswalk'},
             'geo': 'acs5_transformed',
-            'crosswalk_raw':'crosswalk',
             'crosswalk': 'transformer',
             'transformer':'acs5_transformed',
             'acs5':'acs5_transformed',
@@ -306,31 +305,64 @@ from (
         return tbl
 
     
-    def get_transformer(self, geoid_src='tract2018'):
+    def get_transformer(self):
         attr = 'transformer'
-        tbl = f'{attr}.{self.state.abbr}_{get_decade(geoid_src)}'
+        tbl = f'{attr}.{self.state.abbr}_block2020'
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
             path, geoid, level, year, decade = self.parse(tbl)
-            g = geoid+', ' if year<2020 else ''
+            G = {'block':1, 'block_group':1000, 'tract':10000}
+            Y = [2010, 2020]
+            sel0 = ut.make_select([f'div(C.block{y}, {d}) as {g}{y}' for g, d in G.items() for y in Y], 2)
+            sel1 = ut.make_select([f'C.aprop2020 * P.{p}_pop as {p}_pop' for p in P], 2)
+            sel2 = ut.make_select([f'{p}_pop / greatest(1, sum({p}_pop) over (partition by {g}{y})) as {p}_prop_{g}{y}' for p in P for g in G.keys() for y in Y])
             qry = f"""
 select
-    {g}
-    A.block2020,
-    A.block_group2020,
-    A.tract2020,
-    A.vtd2022,
-    A.county,
-    {ut.make_select([f'sum(case when B.{x} = 0 then 0 else A.{x} / B.{x} end) as {x}' for x in subpops.keys()])},
-from {self.get_crosswalk()} as A
-inner join (
-    select {geoid}, {ut.make_select([f'sum({x}) as {x}' for x in subpops.keys()], 2)},
-    from {self.get_crosswalk()}
-    group by {geoid}
-) as B
-using ({geoid})
-group by {g}block2020, block_group2020, tract2020, vtd2022, county"""
-            self.qry_to_tbl(qry, tbl)
-        return tbl
+    *,
+    {sel2},
+from (
+    select
+        {sel0},
+        S.vtd2022,
+        {sel1}
+    from {self.get_crosswalk()} as C
+    inner join (
+        select
+            B.block2020,
+            V.vtd2022,
+            st_area(st_intersection(B.geometry, V.geometry)) as areaint,
+        from {self.get_bloc()} as B
+        join {self.get_vts()} as V
+        on st_intersects(B.geometry, V.geometry)
+        qualify areaint = max(areaint) over (partition by block2020)
+    ) as S
+    using (block2020)
+    join {self.get_pl()} as P
+    using (block2020))"""
+            return tbl
+            
+            
+            
+            
+#             g = geoid+', ' if year<2020 else ''
+#             qry = f"""
+# select
+#     {g}
+#     A.block2020,
+#     A.block_group2020,
+#     A.tract2020,
+#     A.vtd2022,
+#     A.county,
+#     {ut.make_select([f'sum(case when B.{x} = 0 then 0 else A.{x} / B.{x} end) as {x}' for x in subpops.keys()])},
+# from {self.get_crosswalk()} as A
+# inner join (
+#     select {geoid}, {ut.make_select([f'sum({x}) as {x}' for x in subpops.keys()], 2)},
+#     from {self.get_crosswalk()}
+#     group by {geoid}
+# ) as B
+# using ({geoid})
+# group by {g}block2020, block_group2020, tract2020, vtd2022, county"""
+#             self.qry_to_tbl(qry, tbl)
+#         return tbl
 
 
     def get_crosswalk(self):
@@ -338,127 +370,109 @@ group by {g}block2020, block_group2020, tract2020, vtd2022, county"""
         tbl = f'{attr}.{self.state.abbr}_block2020'
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
             path, geoid, level, year, decade = self.parse(tbl)
-            attr_raw = attr+'_raw'
-            tbl_raw  = tbl+'_raw'
-            if not self.bq.get_tbl(tbl_raw, overwrite=(attr_raw in self.refresh) & (tbl_raw not in self.tbls)):
-                self.tbls.add(tbl_raw)
-                with Timer():
-                    rpt(tbl_raw)
-                    zip_file = path / f'TAB2010_TAB2020_ST{self.state.fips}.zip'
-                    url = f'https://www2.census.gov/geo/docs/maps-data/data/rel2020/t10t20/{zip_file.name}'
-                    download(zip_file, url)
-                
-                    txt = zip_file.with_name(f'{zip_file.stem}_{self.state.abbr}.txt'.lower())
-                    df = ut.prep(pd.read_csv(txt, sep='|')).rename(columns={'arealand_int': 'aland', 'blk_2010': 'block_2010', 'blk_2020': 'block_2020'})
-                    for dec in [2010, 2020]:
-                        geoid = get_geoid(df, dec)
-                        df[f'aprop{dec}'] = df['aland'] / np.fmax(df.groupby(geoid)['aland'].transform('sum'), 1)
-                    self.df_to_tbl(df, tbl_raw, cols=['block2010', 'block2020', 'aland', 'aprop2010', 'aprop2020'])
-            qry = f"""
-select
-    C.*,
-    div(C.block2010, 1000) as block_group2010,
-    div(C.block2020, 1000) as block_group2020,
-    div(C.block2010, 10000) as tract2010,
-    div(C.block2020, 10000) as tract2020,
-    G.vtd2022,
-    G.county,
-    {ut.make_select([f'C.aprop2020 * G.{subpop} as {subpop}' for subpop in subpops.keys()])}
-from {tbl_raw} as C
-left join {self.get_geo(block=True)} as G
-using (block2020)"""
-            self.qry_to_tbl(qry, tbl)
+            with Timer():
+                rpt(tbl_raw)
+                zip_file = path / f'TAB2010_TAB2020_ST{self.state.fips}.zip'
+                url = f'https://www2.census.gov/geo/docs/maps-data/data/rel2020/t10t20/{zip_file.name}'
+                download(zip_file, url)
+
+                txt = zip_file.with_name(f'{zip_file.stem}_{self.state.abbr}.txt'.lower())
+                df = ut.prep(pd.read_csv(txt, sep='|')).rename(columns={'arealand_int': 'aland', 'blk_2010': 'block_2010', 'blk_2020': 'block_2020'})
+                for dec in [2010, 2020]:
+                    geoid = get_geoid(df, dec)
+                    df[f'aprop{dec}'] = df['aland'] / np.fmax(df.groupby(geoid)['aland'].transform('sum'), 1)
+                self.df_to_tbl(df, tbl_raw, cols=['block2010', 'block2020', 'aland', 'aprop2010', 'aprop2020'])
         return tbl
 
 
-    def get_geo(self, block=False):
-        r = f'geo.{self.state.abbr}_'
-        if block:
-            attr = 'geo_block'
-            tbl = r+'block2020'
-        else:
-            attr = 'geo'
-            tbl = r+self.geoid
-        path, geoid, level, year, decade = self.parse(tbl)
-        if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
-            if block:
-                qry = f"""
-select
-    P.*,
-    S.* except ({geoid}, geometry),
-    geometry,
-from (
-    select
-        V.{self.geoid},
-        B.* except (geometry),
-        case when perim < 0.1 then 0 else 4 * {np.pi} * atot / (perim * perim) end as polsby_popper,
-        st_area(st_intersection(B.geometry, V.geometry)) / atot as areaint,
-        B.geometry,
-    from (
-        select
-            {geoid},
-            st_distance(geometry, (select st_boundary(us_outline_geom) from bigquery-public-data.geo_us_boundaries.national_outline)) as dist_to_border,
-            aland / 1000  / 1000 as aland,
-            awater  / 1000  / 1000 as awater,
-            st_area(geometry) / 1000  / 1000 as atot,
-            st_perimeter(geometry) / 1000 as perim,
-            geometry,
-        from {self.get_block()}
-    ) as B
-    inner join {self.get_vtd()} as V
-    on st_intersects(B.geometry, V.geometry)
-    qualify areaint = max(areaint) over (partition by {geoid})
-) as S
-inner join {self.get_pl()} as P
-using ({geoid})"""
-                if self.state.abbr == 'TX':
-                    qry += f"""
-inner join {self.get_plan()} as B
-using ({geoid})"""
+#     def get_geo(self, block=False):
+#         r = f'geo.{self.state.abbr}_'
+#         if block:
+#             attr = 'geo_block'
+#             tbl = r+'block2020'
+#         else:
+#             attr = 'geo'
+#             tbl = r+self.geoid
+#         path, geoid, level, year, decade = self.parse(tbl)
+#         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
+#             if block:
+#                 qry = f"""
+# select
+#     P.*,
+#     S.* except ({geoid}, geometry),
+#     geometry,
+# from (
+#     select
+#         V.{self.geoid},
+#         B.* except (geometry),
+#         case when perim < 0.1 then 0 else 4 * {np.pi} * atot / (perim * perim) end as polsby_popper,
+#         st_area(st_intersection(B.geometry, V.geometry)) / atot as areaint,
+#         B.geometry,
+#     from (
+#         select
+#             {geoid},
+#             st_distance(geometry, (select st_boundary(us_outline_geom) from bigquery-public-data.geo_us_boundaries.national_outline)) as dist_to_border,
+#             aland / 1000  / 1000 as aland,
+#             awater  / 1000  / 1000 as awater,
+#             st_area(geometry) / 1000  / 1000 as atot,
+#             st_perimeter(geometry) / 1000 as perim,
+#             geometry,
+#         from {self.get_block()}
+#     ) as B
+#     inner join {self.get_vtd()} as V
+#     on st_intersects(B.geometry, V.geometry)
+#     qualify areaint = max(areaint) over (partition by {geoid})
+# ) as S
+# inner join {self.get_pl()} as P
+# using ({geoid})"""
+#                 if self.state.abbr == 'TX':
+#                     qry += f"""
+# inner join {self.get_plan()} as B
+# using ({geoid})"""
 
-            else:
-                tbl_raw = self.get_geo(block=True)
-                geo_cols = [geoid, 'dist_to_border', 'aland', 'awater', 'atot', 'perim', 'polsby_popper', 'geometry']
-                pop_cols = ['all_tot_pop', 'all_vap_pop', 'white_tot_pop', 'white_vap_pop', 'hisp_tot_pop', 'hisp_vap_pop', 'other_tot_pop', 'other_vap_pop']
-                exclude_cols = ['block2020']
-                district_cols = [x for x in self.bq.get_cols(tbl_raw) if x not in geo_cols + pop_cols + exclude_cols]
-                qry = f"""
-select * except (geometry), geometry,
-from (
-    select *, case when perim < 0.1 then 0 else 4 * {np.pi} * atot / (perim * perim) end as polsby_popper,
-    from (
-        select *, st_perimeter(geometry) / 1000 as perim,        
-        from (
-            select
-                {geoid},
-                min(dist_to_border) as dist_to_border,
-                sum(aland) as aland,
-                sum(awater) as awater,
-                sum(atot) as atot,
-                st_union_agg(geometry) as geometry,
-            from {tbl_raw}
-            group by {geoid}
-            )
-        )
-    ) as S
-join (
-    select
-        {geoid},
-        {ut.make_select([f"sum({col}) as {col}" for col in pop_cols], 2)},
-    from {tbl_raw}
-    group by {geoid}
-) as P
-using ({geoid})
-join (
-    select
-        {geoid},
-        {ut.make_select(district_cols, 2)},
-    from {tbl_raw}
-    qualify row_number() over (partition by {geoid} order by all_tot_pop desc) = 1
-) as D
-using ({geoid})"""
-            self.qry_to_tbl(qry, tbl)
-        return tbl
+#             else:
+#                 tbl_raw = self.get_geo(block=True)
+#                 geo_cols = [geoid, 'dist_to_border', 'aland', 'awater', 'atot', 'perim', 'polsby_popper', 'geometry']
+#                 pop_cols = ['all_tot_pop', 'all_vap_pop', 'white_tot_pop', 'white_vap_pop', 'hisp_tot_pop', 'hisp_vap_pop', 'other_tot_pop', 'other_vap_pop']
+#                 exclude_cols = ['block2020']
+#                 district_cols = [x for x in self.bq.get_cols(tbl_raw) if x not in geo_cols + pop_cols + exclude_cols]
+#                 qry = f"""
+# select * except (geometry), geometry,
+# from (
+#     select *, case when perim < 0.1 then 0 else 4 * {np.pi} * atot / (perim * perim) end as polsby_popper,
+#     from (
+#         select *, st_perimeter(geometry) / 1000 as perim,        
+#         from (
+#             select
+#                 {geoid},
+#                 min(dist_to_border) as dist_to_border,
+#                 sum(aland) as aland,
+#                 sum(awater) as awater,
+#                 sum(atot) as atot,
+#                 st_union_agg(geometry) as geometry,
+#             from {tbl_raw}
+#             group by {geoid}
+#             )
+#         )
+#     ) as S
+# join (
+#     select
+#         {geoid},
+#         {ut.make_select([f"sum({col}) as {col}" for col in pop_cols], 2)},
+#     from {tbl_raw}
+#     group by {geoid}
+# ) as P
+# using ({geoid})
+# join (
+#     select
+#         {geoid},
+#         {ut.make_select(district_cols, 2)},
+#     from {tbl_raw}
+#     qualify row_number() over (partition by {geoid} order by all_tot_pop desc) = 1
+# ) as D
+# using ({geoid})"""
+#             self.qry_to_tbl(qry, tbl)
+#         return tbl
 
 
     def get_plan(self):
