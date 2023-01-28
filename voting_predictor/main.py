@@ -478,10 +478,10 @@ from (
     def get_shape(self, attr, geoid, url):
         tbl = f'shape.{self.state.abbr}_{geoid}'
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
+            path, geoid, level, year, decade = self.parse(tbl)
             attr_raw = attr+'_raw'
             tbl_raw = tbl+'_raw'
             if not self.bq.get_tbl(tbl_raw, overwrite=(attr_raw in self.refresh) & (tbl_raw not in self.tbls)):
-                path, geoid, level, year, decade = self.parse(tbl_raw)
                 with Timer():
                     rpt(tbl)
                     zip_file = path / url.split('/')[-1]
