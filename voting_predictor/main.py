@@ -312,8 +312,8 @@ from (
             G = {'block':1, 'block_group':1000, 'tract':10000}
             Y = [2010, 2020]
             sel0 = ut.make_select([f'div(C.block{y}, {d}) as {g}{y}' for g, d in G.items() for y in Y], 2)
-            sel1 = ut.make_select([f'C.aprop2020 * P.{p}_pop as {p}_pop' for p in P], 2)
-            sel2 = ut.make_select([f'{p}_pop / greatest(1, sum({p}_pop) over (partition by {g}{y})) as {p}_prop_{g}{y}' for p in P for g in G.keys() for y in Y])
+            sel1 = ut.make_select([f'C.aprop2020 * P.{p}_pop as {p}_pop' for p in subpops.keys()], 2)
+            sel2 = ut.make_select([f'{p}_pop / greatest(1, sum({p}_pop) over (partition by {g}{y})) as {p}_prop_{g}{y}' for p in subpops.keys() for g in G.keys() for y in Y])
             qry = f"""
 select
     *,
