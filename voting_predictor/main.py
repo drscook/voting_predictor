@@ -329,8 +329,8 @@ from (
             B.block2020,
             V.vtd2022,
             st_area(st_intersection(B.geometry, V.geometry)) as areaint,
-        from {self.get_bloc()} as B
-        join {self.get_vts()} as V
+        from {self.get_block()} as B
+        join {self.get_vtd()} as V
         on st_intersects(B.geometry, V.geometry)
         qualify areaint = max(areaint) over (partition by block2020)
     ) as S
