@@ -483,7 +483,7 @@ from (
             tbl_raw = tbl+'_raw'
             if not self.bq.get_tbl(tbl_raw, overwrite=(attr_raw in self.refresh) & (tbl_raw not in self.tbls)):
                 with Timer():
-                    rpt(tbl)
+                    rpt(tbl_raw)
                     zip_file = path / url.split('/')[-1]
                     download(zip_file, url, unzip=False)
                     d = decade % 100
