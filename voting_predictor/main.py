@@ -309,7 +309,6 @@ from (
         attr = 'transformer'
         tbl = f'{attr}.{self.state.abbr}_block2020'
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
-            path, geoid, level, year, decade = self.parse(tbl)
             G = {'block':1, 'block_group':1000, 'tract':10000}
             Y = [2010, 2020]
             sel0 = ut.make_select([f'div(C.block{y}, {d}) as {g}{y}' for g, d in G.items() for y in Y], 2)
@@ -338,7 +337,8 @@ from (
     using (block2020)
     join {self.get_pl()} as P
     using (block2020))"""
-            return tbl
+            self.qry_to_tbl(qry, tbl)
+        return tbl
             
             
             
@@ -371,7 +371,7 @@ from (
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
             path, geoid, level, year, decade = self.parse(tbl)
             with Timer():
-                rpt(tbl_raw)
+                rpt(tbl)
                 zip_file = path / f'TAB2010_TAB2020_ST{self.state.fips}.zip'
                 url = f'https://www2.census.gov/geo/docs/maps-data/data/rel2020/t10t20/{zip_file.name}'
                 download(zip_file, url)
@@ -381,7 +381,7 @@ from (
                 for dec in [2010, 2020]:
                     geoid = get_geoid(df, dec)
                     df[f'aprop{dec}'] = df['aland'] / np.fmax(df.groupby(geoid)['aland'].transform('sum'), 1)
-                self.df_to_tbl(df, tbl_raw, cols=['block2010', 'block2020', 'aland', 'aprop2010', 'aprop2020'])
+                self.df_to_tbl(df, tbl, cols=['block2010', 'block2020', 'aland', 'aprop2010', 'aprop2020'])
         return tbl
 
 
@@ -475,6 +475,48 @@ from (
 #         return tbl
 
 
+    def get_shape(self, attr, geoid, url):
+        tbl = f'shape.{self.state.abbr}_{geoid}'
+        if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
+            attr_raw = attr+'_raw'
+            tbl_raw = tbl+'_raw'
+            if not self.bq.get_tbl(tbl_raw, overwrite=(attr_raw in self.refresh) & (tbl_raw not in self.tbls)):
+                path, geoid, level, year, decade = self.parse(tbl_raw)
+                with Timer():
+                    rpt(tbl)
+                    zip_file = path / url.split('/')[-1]
+                    download(zip_file, url, unzip=False)
+                    d = decade % 100
+                    repl = {'vtdkey':f'vtd{year}', f'geoid{d}':f'block{year}', f'aland{d}': 'aland', f'awater{d}': 'awater', 'geometry':'geometry',}
+                    df = ut.prep(gpd.read_file(zip_file)).rename(columns=repl)
+                    df.geometry = df.geometry.to_crs(CRS['bigquery']).buffer(0).apply(orient, args=(1,))
+                    self.df_to_tbl(df, tbl_raw, cols=repl.values())
+            qry = f"""
+select
+    * except (geometry),
+    case when perim < 0.1 then 0 else 4 * {np.pi} * atot / (perim * perim) end as polsby_popper,
+    geometry,
+from (
+    select
+        *,
+        st_distance(geometry, (select st_boundary(us_outline_geom) from bigquery-public-data.geo_us_boundaries.national_outline)) as dist_to_border,
+        st_area(geometry) / 1000  / 1000 as atot,
+        st_perimeter(geometry) / 1000 as perim,
+    from {tbl_raw})"""
+            self.qry_to_tbl(qry, tbl)
+        return tbl
+
+
+    def get_vtd(self):
+        url = 'https://data.capitol.texas.gov/dataset/4d8298d0-d176-4c19-b174-42837027b73e/resource/037e1de6-a862-49de-ae31-ae609e214972/download/vtds_22g.zip'
+        return self.get_shape('vtd', 'vtd2022', url)
+
+
+    def get_block(self):
+        url = f'https://www2.census.gov/geo/tiger/TIGER2020/TABBLOCK20/tl_2020_{self.state.fips}_tabblock20.zip'
+        return self.get_shape('block', 'block2020', url)
+
+   
     def get_plan(self):
         if self.state.abbr != 'TX':
             return False
@@ -531,29 +573,3 @@ from (
                 df['county'] = df['name'].str.split(', ', expand=True)[3].str[:-7]
                 self.df_to_tbl(df, tbl, cols=[geoid, 'county', *subpops.keys()])
         return tbl
-
-
-    def get_shape(self, attr, geoid, url):
-        tbl = f'shape.{self.state.abbr}_{geoid}'
-        if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
-            path, geoid, level, year, decade = self.parse(tbl)
-            with Timer():
-                rpt(tbl)
-                zip_file = path / url.split('/')[-1]
-                download(zip_file, url, unzip=False)
-                d = decade % 100
-                repl = {'vtdkey':f'vtd{year}', f'geoid{d}':f'block{year}', f'aland{d}': 'aland', f'awater{d}': 'awater', 'geometry':'geometry',}
-                df = ut.prep(gpd.read_file(zip_file)).rename(columns=repl)
-                df.geometry = df.geometry.to_crs(CRS['bigquery']).buffer(0).apply(orient, args=(1,))
-                self.df_to_tbl(df, tbl, cols=repl.values())
-        return tbl
-
-
-    def get_vtd(self):
-        url = 'https://data.capitol.texas.gov/dataset/4d8298d0-d176-4c19-b174-42837027b73e/resource/037e1de6-a862-49de-ae31-ae609e214972/download/vtds_22g.zip'
-        return self.get_shape('vtd', 'vtd2022', url)
-
-
-    def get_block(self):
-        url = f'https://www2.census.gov/geo/tiger/TIGER2020/TABBLOCK20/tl_2020_{self.state.fips}_tabblock20.zip'
-        return self.get_shape('block', 'block2020', url)
