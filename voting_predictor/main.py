@@ -267,7 +267,7 @@ select
     {ut.select(sel_all)},
 from (
     {ut.subquery(qry)})"""
-            feat_den = [f'{x} / greatest(1, aland) as {x.replace("pop", "den")}' for x in subpops.keys()]
+            feat_den = [f'{x} / greatest(1, aland)  * 1000 * 1000 as {x.replace("pop", "den")}' for x in subpops.keys()]
             qry = f"""
 select
     year,
@@ -289,7 +289,7 @@ from (
         tbl = f'{attr}.{self.state.abbr}_{geoid}'
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
             sel_pop = [f'sum({x}) as {x}' for x in subpops.keys()]
-            sel_den = [f'sum({x}) / greatest(1, sum(aland)) as {x.replace("pop", "den")}' for x in subpops.keys()]
+            sel_den = [f'sum({x}) / greatest(1, sum(aland)  * 1000 * 1000) as {x.replace("pop", "den")}' for x in subpops.keys()]
             sel_geo = [f'sum({x}) as {x}' for x in ['aland', 'awater', 'atot']]
             qry = f"""
 select
@@ -303,14 +303,13 @@ from {self.get_intersection()}
 group by {geoid}"""
             f = lambda x: f'join (select {geoid}, {x}, sum(pop_tot_all) as p from {self.get_intersection()} group by {geoid}, {x} qualify row_number() over (partition by {geoid} order by p desc) = 1) as {x}_tbl using ({geoid})'
             sel_plan  = ['county', *self.bq.get_cols(self.get_plan())[1:]]
-            sel_den   = [f'{x} / greatest(1, aland) as {x.replace("pop", "den")}' for x in subpops.keys()]
             join_plan = ut.join([f(x) for x in sel_plan], '\n')
             qry = f"""
 select
     {geoid},
     {ut.join(sel_plan)},
     A.* except ({geoid}),
-    st_perimeter(geometry) / 1000 as perim,
+    st_perimeter(geometry) as perim,
 from (
     {ut.subquery(qry)}
 ) as A
@@ -360,7 +359,7 @@ join {self.get_shape()['vtd2022']} as B on st_intersects(A.geometry, B.geometry)
 qualify areaint2022 = max(areaint2022) over (partition by block2010, block2020)"""
             sel_id  = [f'div(A.block{year}, {10**(15-self.levels[level])}) as {level}{year}' for level in self.levels.keys() for year in [2020, 2010]][::-1]
             sel_pop = [f'A.aprop2020 * B.{p} as {p}' for p in subpops.keys()]
-            sel_den = [f'A.aprop2020 * B.{p} / greatest(1, aland) as {p.replace("pop", "den")}' for p in subpops.keys()]
+            sel_den = [f'A.aprop2020 * B.{p} / greatest(1, aland) * 1000 * 1000 as {p.replace("pop", "den")}' for p in subpops.keys()]
             qry = f"""
 select
     {ut.select(sel_id)},
@@ -373,8 +372,8 @@ select
     st_distance(A.geometry, (select st_boundary(us_outline_geom) from bigquery-public-data.geo_us_boundaries.national_outline)) as dist_to_border,
     aland,
     awater,
-    st_area(A.geometry) / 1000  / 1000 as atot,
-    st_perimeter(A.geometry) / 1000 as perim,
+    st_area(A.geometry) as atot,
+    st_perimeter(A.geometry) as perim,
     geometry,
 from (
     {ut.subquery(qry)}
