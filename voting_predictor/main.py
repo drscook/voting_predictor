@@ -213,13 +213,7 @@ from (
                             df['election'] = ut.join(a[1:-2], '_')
                             df['name'] = ut.replace(df['name'], repl)
                             df['incumbent'] = df['incumbent'] == 'Y'
-#                             ut.pprint(df.head(3))                            
-#                             df = df.loc[mask, cols]
-#                             ut.pprint(df.head(3))
-#                             assert 1==2
-
                             L.append(df.loc[mask, cols])
-                                      
                 df = ut.prep(pd.concat(L, axis=0)).reset_index(drop=True)
                 self.df_to_tbl(df, tbl)
         return tbl
@@ -281,7 +275,7 @@ select
     year,
     {geoid},
     county,
-    ntile(3) over (order by {feat_den[0]} asc) as urbanization,
+    ntile(3) over (order by {feat_den[0].split(' as ')[0]} asc) as urbanization,
     {ut.make_select(feat_den)},
     {ut.make_select(feat_acs)},
     {ut.make_select(feat_geo)},
