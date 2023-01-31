@@ -432,8 +432,8 @@ from (
                 df = ut.prep(pd.read_csv(txt, sep='|')).rename(columns=repl)
                 for year in [2010, 2020]:
                     geoid = self.get_geoid(df, level='block', year=year)
-                for x in ['aland', 'awater']:
-                    df[x]  = df[x] / 1000 / 1000
+#                 for x in ['aland', 'awater']:
+#                     df[x]  = df[x] / 1000 / 1000
                 self.df_to_tbl(df, tbl, cols=['block2010', 'block2020', 'aland', 'awater'])
         return tbl
 
