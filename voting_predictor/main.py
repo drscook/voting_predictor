@@ -172,7 +172,7 @@ from (
         coalesce(D, 0) as vote_dem,
         coalesce(R, 0) as vote_rep,
         coalesce(D, 0) + coalesce(R, 0) as vote_tot,
-    from {self.get_acs(level='tract', year=min(year, datetime.date.today().year-2), geoid_trg=geoid)} as A
+    from {self.get_acs(level='tract', year=min(year+1, datetime.date.today().year-2), geoid_trg=geoid)} as A
     left join (
         select {geoid}, midterm, federal, party, votes,
         from {self.get_election()}
