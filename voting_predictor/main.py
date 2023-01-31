@@ -275,19 +275,7 @@ select
     {sel_geo},
 from (
     {ut.subquery(qry)})"""
-
-            
-# #             qry = f"""
-# select
-#     year,
-#     {geoid},
-#     county,
-#     {sel_all},
-#     * except (year, {geoid}, county),
-# from (
-#     {ut.subquery(qry)})"""
-            
-            self.qry_to_tbl(qry, tbl, True)
+            self.qry_to_tbl(qry, tbl)
         return tbl
 
 
