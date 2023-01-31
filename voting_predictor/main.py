@@ -304,12 +304,11 @@ group by {geoid}"""
             f = lambda x: f'join (select {geoid}, {x}, sum(pop_tot_all) as p from {self.get_intersection()} group by {geoid}, {x} qualify row_number() over (partition by {geoid} order by p desc) = 1) as {x}_tbl using ({geoid})'
             sel_plan = ['county', *self.bq.get_cols(self.get_plan())[1:]]
             join_plan = [f(x) for x in sel_plan]
-#             sel_plan  = ut.join(plan)
             sel_den = [f'{x} / greatest(1, aland) as {x.replace("pop", "den")}' for x in subpops.keys()]
             qry = f"""
 select
     {geoid},
-    {ut.make_select(sel_plan},
+    {ut.join(sel_plan},
     A.* except ({geoid}),
     st_perimeter(geometry) / 1000 as perim,
 from (
