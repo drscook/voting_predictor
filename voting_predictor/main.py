@@ -253,8 +253,8 @@ select
     A.year,
     T.{geoid_trg},
     T.county,
-    {ut.make_select(sel_grp)},
-    {ut.make_select(sel_geo)},
+    {ut.select(sel_grp)},
+    {ut.select(sel_geo)},
 from {tbl_src} as A
 join {self.get_intersection()} as I using ({geoid_src})
 join {self.get_geo(geoid_src)} as S using ({geoid_src})
@@ -264,7 +264,7 @@ group by 1,2,3"""
             qry = f"""
 select
     *,
-    {ut.make_select(sel_all)},
+    {ut.select(sel_all)},
 from (
     {ut.subquery(qry)})"""
             feat_den = [f'{x} / greatest(1, aland) as {x.replace("pop", "den")}' for x in subpops.keys()]
@@ -274,9 +274,9 @@ select
     {geoid},
     county,
     ntile(3) over (order by {feat_den[0].split(' as ')[0]} asc) as urbanization,
-    {ut.make_select(feat_den)},
-    {ut.make_select(feat_acs)},
-    {ut.make_select(feat_geo)},
+    {ut.select(feat_den)},
+    {ut.select(feat_acs)},
+    {ut.select(feat_geo)},
 from (
     {ut.subquery(qry)})"""
             self.qry_to_tbl(qry, tbl_trg)
@@ -294,10 +294,10 @@ from (
             qry = f"""
 select
     {geoid},
-    {ut.make_select(sel_den)},
-    {ut.make_select(sel_pop)},
+    {ut.select(sel_den)},
+    {ut.select(sel_pop)},
     min(dist_to_border) as dist_to_border,
-    {ut.make_select(sel_geo)},
+    {ut.select(sel_geo)},
     st_union_agg(geometry) as geometry,
 from {self.get_intersection()}
 group by {geoid}"""
@@ -314,7 +314,7 @@ select
 from (
     {ut.subquery(qry)}
 ) as A
-{ut.make_select(join_plan)}"""
+{ut.select(join_plan)}"""
             qry = f"""
 select
     * except (geometry),
@@ -363,13 +363,13 @@ qualify areaint2022 = max(areaint2022) over (partition by block2010, block2020)"
             sel_den = [f'A.aprop2020 * B.{p} / greatest(1, aland) as {p.replace("pop", "den")}' for p in subpops.keys()]
             qry = f"""
 select
-    {ut.make_select(sel_id)},
+    {ut.select(sel_id)},
     vtd2020,
     vtd2022,
     county,
     C.* except (block2020),
-    {ut.make_select(sel_den)},
-    {ut.make_select(sel_pop)},
+    {ut.select(sel_den)},
+    {ut.select(sel_pop)},
     st_distance(A.geometry, (select st_boundary(us_outline_geom) from bigquery-public-data.geo_us_boundaries.national_outline)) as dist_to_border,
     aland,
     awater,
