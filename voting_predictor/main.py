@@ -239,7 +239,7 @@ from (
                         if 'all' in x:
                             self.compute_other(df, x)
                     self.df_to_tbl(df, tbl_src)
-            feat = sorted(self.bq.get_cols(tbl_src)[2:])
+            feat = self.bq.get_cols(tbl_src)[2:]
 #             feat_all = [x for x in feat if x[:3] == 'all']
 #             feat_grp = [x for x in feat if x not in feat_all]
 #             feat_grp = [x for x in feat if x[:3] != 'all']
@@ -251,7 +251,6 @@ from (
             sel_grp = ut.make_select([f'sum(A.{x} * B.{f(x)} / greatest(1, C.{f(x)})) as {x}' for x in feat if not "all" in x])
 #             sel_geo  = ut.make_select([f'min(C.{x}) as {x}' for x in feat_geo])
             sel_geo  = ut.make_select([f'min(C.{x}) as {x}' for x in ['aland', 'awater', 'atot', 'perim', 'polsby_popper']])
-            
             qry = f"""
 select
     A.year,
@@ -266,13 +265,27 @@ group by 1,2,3"""
             sel_all = ut.make_select([f'{x.replace("all", "hisp")} + {x.replace("all", "other")} + {x.replace("all", "white")} as {x}' for x in feat if "all" in x])
             qry = f"""
 select
-    year,
-    {geoid},
-    county,
+    *,
     {sel_all},
-    * except (year, {geoid}, county),
 from (
     {ut.subquery(qry)})"""
+select
+    *,
+    {sel_all},
+from (
+    {ut.subquery(qry)})"""
+
+            
+#             qry = f"""
+# select
+#     year,
+#     {geoid},
+#     county,
+#     {sel_all},
+#     * except (year, {geoid}, county),
+# from (
+#     {ut.subquery(qry)})"""
+            
             self.qry_to_tbl(qry, tbl)
         return tbl
 
@@ -462,11 +475,14 @@ from (
             with Timer():
                 self.rpt(tbl)
                 repl = {v:k for k,v in subpops.items() if v}
+                print(repl)
                 df = self.fetch_census(fields=['name', *repl.keys()], dataset='pl', year=year, level='block').rename(columns=repl)
+                print(df.columns)
                 self.compute_other(df, 'pop_tot_other')
                 self.compute_other(df, 'pop_vap_other')
                 county = df['name'].str.split(', ', expand=True)[3].str[:-7]
                 df['county'] = df['name'].str.split(', ', expand=True)[3].str[:-7]
+                print(df.columns)
                 self.df_to_tbl(df, tbl, cols=[geoid, 'county', *subpops.keys()])
         return tbl
 
