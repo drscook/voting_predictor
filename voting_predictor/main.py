@@ -198,7 +198,7 @@ from (
                 url = f'https://data.capitol.texas.gov/dataset/35b16aee-0bb0-4866-b1ec-859f1f044241/resource/b9ebdbdb-3e31-4c98-b158-0e2993b05efc/download/{zip_file.name}'
                 download(zip_file, url)
                 L = []
-                cols = [self.geoid, 'year', 'office', 'federal', 'election', 'name', 'party', 'incumbent', 'votes']                    
+                cols = [self.geoid, 'year', 'midterm', 'office', 'federal', 'election', 'name', 'party', 'incumbent', 'votes']                    
                 for file in path.iterdir():
                     a = ut.prep(file.stem.split('_'))
                     if ('general' in a) & ('returns' in a):
