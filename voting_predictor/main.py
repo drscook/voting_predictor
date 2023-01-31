@@ -114,10 +114,11 @@ class Voting():
         return ut.prep(df[['year', geoid, *ut.prep(fields)]])
 
     def compute_other(self, df, feat):
+        feat = feat.replace('all', '').replace('hisp', '').replace('white', '').replace('other', '')
         try:
-            df['other_'+feat] = df['all_'+feat] - df['white_'+feat] - df['hisp_'+feat]
+            df[feat+'other'] = df[feat+'all'] - df[feat+'hisp'] - df[feat+'white'] 
         except KeyError:
-            print(f'Can not compute other_{feat}', end=ellipsis)
+            print(f'Can not compute other{feat}', end=ellipsis)
 
     def qry_to_tbl(self, qry, tbl, show=False):
         with Timer():
@@ -234,17 +235,23 @@ from (
                     for name, fields in features.items():
                         df[name] = df[fields].sum(axis=1)
                     df = df[['year', geoid_src, *sorted(features.keys())]]
-                    for var in [x[4:] for x in features.keys() if x[:3] == 'all']:
-                        self.compute_other(df, var)
+                    for x in features.keys():
+                        if 'all' in x:
+                            self.compute_other(df, x)
                     self.df_to_tbl(df, tbl_src)
             feat = sorted(self.bq.get_cols(tbl_src)[2:])
-            feat_grp = [x for x in feat if x[:3] != 'all']
-            feat_all = [x[4:] for x in feat if x not in feat_grp]
-            feat_geo = ['aland', 'awater', 'atot', 'perim', 'polsby_popper']
-            f = lambda x: x[:ut.findn(x, '_', 2)]+'_pop'
-            sel_grp = ut.make_select([f'sum(A.{x} * B.{f(x)} / greatest(1, C.{f(x)})) as {x}' for x in feat_grp])
-            sel_all = ut.make_select([f'white_{x} + hisp_{x} + other_{x} as all_{x}' for x in feat_all])
-            sel_geo  = ut.make_select([f'min(C.{x}) as {x}' for x in feat_geo])
+#             feat_all = [x for x in feat if x[:3] == 'all']
+#             feat_grp = [x for x in feat if x not in feat_all]
+#             feat_grp = [x for x in feat if x[:3] != 'all']
+#             feat_all = [x[4:] for x in feat if x not in feat_grp]
+            
+#             feat_geo = ['aland', 'awater', 'atot', 'perim', 'polsby_popper']
+#             f = lambda x: x[:ut.findn(x, '_', 2)]+'_pop'
+            f = lambda x: 'pop'+x[x.find('_'):]
+            sel_grp = ut.make_select([f'sum(A.{x} * B.{f(x)} / greatest(1, C.{f(x)})) as {x}' for x in feat if not "all" in x])
+#             sel_geo  = ut.make_select([f'min(C.{x}) as {x}' for x in feat_geo])
+            sel_geo  = ut.make_select([f'min(C.{x}) as {x}' for x in ['aland', 'awater', 'atot', 'perim', 'polsby_popper']])
+            
             qry = f"""
 select
     A.year,
@@ -256,6 +263,7 @@ from {tbl_src} as A
 join {self.get_intersection()} as B using ({geoid_src})
 join {self.get_geo(geoid_src)} as C using ({geoid_src})
 group by 1,2,3"""
+            sel_all = ut.make_select([f'{x.replace("all", "hisp")} + {x.replace("all", "other")} + {x.replace("all", "white")} as {x}' for x in feat if "all" in x])
             qry = f"""
 select
     year,
@@ -455,8 +463,8 @@ from (
                 self.rpt(tbl)
                 repl = {v:k for k,v in subpops.items() if v}
                 df = self.fetch_census(fields=['name', *repl.keys()], dataset='pl', year=year, level='block').rename(columns=repl)
-                self.compute_other(df, 'tot_pop')
-                self.compute_other(df, 'vap_pop')
+                self.compute_other(df, 'pop_tot_other')
+                self.compute_other(df, 'pop_vap_other')
                 county = df['name'].str.split(', ', expand=True)[3].str[:-7]
                 df['county'] = df['name'].str.split(', ', expand=True)[3].str[:-7]
                 self.df_to_tbl(df, tbl, cols=[geoid, 'county', *subpops.keys()])
