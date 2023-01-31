@@ -161,14 +161,16 @@ from (
 select
     *,
     votes_tot / greatest(1, pop_vap_all) as vote_rate,
-    votes_dem / greatest(1, votes_tot) as pref_dem,
-    votes_rep / greatest(1, votes_tot) as pref_rep,
+    votes_dem / greatest(1, vote_tot) as pref_dem,
+    votes_rep / greatest(1, vote_tot) as pref_rep,
     
 from (
     select 
         * except (D, R),
         "{campaign}" as campaign,
         "{candidates}" as candidates,
+        {('President' in campaign) | ('USSen' in campaign)} as federal,
+        {year%4==2} as midterm,
         coalesce(D, 0) as vote_dem,
         coalesce(R, 0) as vote_rep,
         coalesce(D, 0) + coalesce(R, 0) as vote_tot,
