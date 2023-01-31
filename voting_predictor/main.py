@@ -174,7 +174,7 @@ from (
         coalesce(D, 0) + coalesce(R, 0) as vote_tot,
     from {self.get_acs(year=min(year, datetime.date.today().year-2))} as A
     left join (
-        select {geoid}, party, votes,
+        select {geoid}, midterm, federal, party, votes,
         from {self.get_election()}
         where office = "{office}" and year = {year})
         pivot(sum(votes) for party in ("D", "R")
