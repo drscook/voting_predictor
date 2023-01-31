@@ -329,7 +329,7 @@ from (
 #             group by {geoid}
 #         ) as A
 #         {join_plan}))"""
-            self.qry_to_tbl(qry, tbl)
+            self.qry_to_tbl(qry, tbl, True)
         return tbl
 
 
@@ -396,9 +396,7 @@ select
     geometry,
 from (
     {ut.subquery(qry)})"""
-
-
-            self.qry_to_tbl(qry, tbl)
+            self.qry_to_tbl(qry, tbl, True)
         return tbl
 
 
