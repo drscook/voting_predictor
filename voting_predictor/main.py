@@ -267,9 +267,6 @@ select
 from (
     {ut.subquery(qry)})"""
             feat_den = [f'{x} / greatest(1, aland) as {x.replace("pop", "den")}' for x in subpops.keys()]
-#             sel_den = ut.make_select([f'{x} / greatest(1, aland) as {x.replace("pop", "den")}' for x in subpops.keys()])
-#             sel_acs = ut.make_select(feat_acs)
-#             sel_geo = ut.make_select(feat_geo)
             qry = f"""
 select
     year,
@@ -281,7 +278,7 @@ select
     {ut.make_select(feat_geo)},
 from (
     {ut.subquery(qry)})"""
-            self.qry_to_tbl(qry, tbl, True)
+            self.qry_to_tbl(qry, tbl)
         return tbl
 
 
