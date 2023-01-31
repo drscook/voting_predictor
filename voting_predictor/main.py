@@ -412,7 +412,7 @@ join {self.get_plan()} as C using(block2020)"""
         geoid = 'block2020'
         tbl = f'{attr}.{self.state.abbr}_{geoid}'
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
-            path, geoid, level, year, decade = self.parse(tbl)
+            path, level, year, decade = self.parse(tbl)
             with Timer():
                 self.rpt(tbl)
                 repl = {v:k for k,v in subpops.items() if v}
