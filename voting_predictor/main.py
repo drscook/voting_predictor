@@ -163,7 +163,6 @@ select
     vote_tot / greatest(1, pop_vap_all) as vote_rate,
     vote_dem / greatest(1, vote_tot) as pref_dem,
     vote_rep / greatest(1, vote_tot) as pref_rep,
-    
 from (
     select 
         * except (D, R),
@@ -213,7 +212,12 @@ from (
                             df['election'] = ut.join(a[1:-2], '_')
                             df['name'] = ut.replace(df['name'], repl)
                             df['incumbent'] = df['incumbent'] == 'Y'
+                            ut.pprint(df.head(3))
+                            ut.pprint(df.loc[mask, cols].head(3))
+                            assert 1==2
+
                             L.append(df.loc[mask, cols])
+                                      
                 df = ut.prep(pd.concat(L, axis=0)).reset_index(drop=True)
                 self.df_to_tbl(df, tbl)
         return tbl
