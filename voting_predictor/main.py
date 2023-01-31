@@ -160,9 +160,9 @@ from (
                 qry = f"""
 select
     *,
-    votes_tot / greatest(1, pop_vap_all) as vote_rate,
-    votes_dem / greatest(1, vote_tot) as pref_dem,
-    votes_rep / greatest(1, vote_tot) as pref_rep,
+    vote_tot / greatest(1, pop_vap_all) as vote_rate,
+    vote_dem / greatest(1, vote_tot) as pref_dem,
+    vote_rep / greatest(1, vote_tot) as pref_rep,
     
 from (
     select 
