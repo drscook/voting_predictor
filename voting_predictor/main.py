@@ -234,7 +234,7 @@ from (
                     df = ut.prep(B.merge(S, on=['year', geoid_src]))
                     for name, fields in features.items():
                         df[name] = df[fields].sum(axis=1)
-                    df = df[['year', geoid_src, *sorted(features.keys())]]
+                    df = df[['year', geoid_src, *features.keys()]]
                     for x in features.keys():
                         if 'all' in x:
                             self.compute_other(df, x)
@@ -330,27 +330,7 @@ select
     geometry,
 from (
     {ut.subquery(qry)})"""
-
-            
-#             qry = f"""
-# select * except (geometry), case when perim < 0.1 then 0 else 4 * {np.pi} * atot / (perim * perim) end as polsby_popper, geometry,
-# from (
-#     select *, st_perimeter(geometry) / 1000 as perim,
-#     from (
-#         select
-#             {geoid},
-#             {sel_plan},
-#             A.* except ({geoid}),
-#         from (
-#             select
-#                 {geoid},
-#                 {sel_sum},
-#                 st_union_agg(geometry) as geometry,
-#             from {self.get_intersection()}
-#             group by {geoid}
-#         ) as A
-#         {join_plan}))"""
-            self.qry_to_tbl(qry, tbl, True)
+            self.qry_to_tbl(qry, tbl)
         return tbl
 
 
@@ -398,7 +378,6 @@ select
     C.* except (block2020),
     {sel_pop},
     {sel_den},
-    --aprop2020,
     st_distance(A.geometry, (select st_boundary(us_outline_geom) from bigquery-public-data.geo_us_boundaries.national_outline)) as dist_to_border,
     aland,
     awater,
@@ -417,7 +396,7 @@ select
     geometry,
 from (
     {ut.subquery(qry)})"""
-            self.qry_to_tbl(qry, tbl, True)
+            self.qry_to_tbl(qry, tbl)
         return tbl
 
 
