@@ -13,6 +13,7 @@ features = {
     'pop_tot_all': ['b01001_001e'],
     'pop_tot_hisp': ['b01001i_001e'],
     'pop_tot_white': ['b01001h_001e'],
+    'pop_tot_other': [],
     'pop_vap_all': [
         'b01001_007e',
         'b01001_008e',
@@ -94,6 +95,7 @@ features = {
         'b01001h_029e',
         'b01001h_030e',
         'b01001h_031e'],
+    'pop_vap_other': [],
     'elderly_vap_all': [
         'b01001_017e',
         'b01001_018e',
@@ -131,6 +133,7 @@ features = {
         'b01001h_029e',
         'b01001h_030e',
         'b01001h_031e'],
+    'elderly_vap_other': [],
     'poverty_vap_all': [
         'b17001_010e',
         'b17001_011e',
@@ -176,12 +179,15 @@ features = {
         'b17001h_028e',
         'b17001h_029e',
         'b17001h_030e'],
+    'poverty_vap_other': [],
     'highschool_vap_all': ['s1501_c01_009e', 's1501_c01_010e', 's1501_c01_011e', 's1501_c01_012e', 's1501_c01_013e'],
     'highschool_vap_hisp': ['s1501_c01_053e'],
     'highschool_vap_white': ['s1501_c01_032e'],
+    'highschool_vap_other': [],
     'homeowner_vap_all': ['b25003_002e'],
     'homeowner_vap_hisp': ['b25003i_002e'],
     'homeowner_vap_white': ['b25003h_002e'],
+    'homeowner_vap_other': [],
     'spanishathome_vap_hisp': ['b16004_026e'],
     'spanishathomeenglishwell_vap_hisp': ['b16004_027e', 'b16004_028e'],
 }
