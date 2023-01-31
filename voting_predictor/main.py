@@ -198,6 +198,7 @@ from (
                 cols = [self.geoid, 'office', 'year', 'election', 'name', 'party', 'incumbent', 'votes']                    
                 for file in path.iterdir():
                     a = ut.prep(file.stem.split('_'))
+                    print(file.stem, a)
                     if (a[1] == 'general') & (a[-1] == 'returns'):
                         df = ut.prep(pd.read_csv(file)).rename(columns={'vtdkeyvalue':self.geoid})
                         mask = (df['votes'] > 0) & (df['party'].isin(('R', 'D', 'L', 'G')))
