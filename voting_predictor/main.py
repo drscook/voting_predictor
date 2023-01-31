@@ -166,9 +166,9 @@ select
     vote_rep / greatest(1, vote_tot) as pref_rep,
 from (
     select 
-        * except (D, R),
         "{campaign}" as campaign,
         "{candidates}" as candidates,
+        * except (D, R),
         coalesce(D, 0) as vote_dem,
         coalesce(R, 0) as vote_rep,
         coalesce(D, 0) + coalesce(R, 0) as vote_tot,
