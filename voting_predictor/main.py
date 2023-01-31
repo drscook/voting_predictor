@@ -322,7 +322,7 @@ select
     geometry,
 from (
     {ut.subquery(qry)})"""
-            self.qry_to_tbl(qry, tbl)
+            self.qry_to_tbl(qry, tbl, True)
         return tbl
 
 
