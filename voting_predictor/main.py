@@ -233,12 +233,17 @@ from (
                     S = self.fetch_census(fields=survey, dataset='acs5st', year=year, level=level)
                     df = ut.prep(B.merge(S, on=['year', geoid_src]))
                     for name, fields in features.items():
-                        df[name] = df[fields].sum(axis=1)
-                    df = df[['year', geoid_src, *features.keys()]]
-                    for x in features.keys():
-                        if 'all' in x:
-                            self.compute_other(df, x)
-                    self.df_to_tbl(df, tbl_src)
+                        if fields:
+                            df[name] = df[fields].sum(axis=1)
+                    for name, fields in features.items():
+                        if not fields:
+                            self.compute_other(df, name)
+                    self.df_to_tbl(df, tbl_src, cols=['year', geoid_src, *features.keys()])    
+#                     df = df[['year', geoid_src, *features.keys()]]
+#                     for x in features.keys():
+#                         if 'all' in x:
+#                             self.compute_other(df, x)
+#                     self.df_to_tbl(df, tbl_src, cols=['year', geoid_src, *features.keys()])
             feat = self.bq.get_cols(tbl_src)[2:]
 #             feat_all = [x for x in feat if x[:3] == 'all']
 #             feat_grp = [x for x in feat if x not in feat_all]
