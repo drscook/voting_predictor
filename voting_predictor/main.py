@@ -244,7 +244,7 @@ from (
             f = lambda x: x[:ut.findn(x, '_', 2)]+'_pop'
             sel_grp = ut.make_select([f'sum(A.{x} * B.{f(x)} / greatest(1, C.{f(x)})) as {x}' for x in feat_grp])
             sel_all = ut.make_select([f'white_{x} + hisp_{x} + other_{x} as all_{x}' for x in feat_all])
-            sel_geo  = ut.make_select([f'max(C.{x}) as {x}' for x in feat_geo])
+            sel_geo  = ut.make_select([f'min(C.{x}) as {x}' for x in feat_geo])
             qry = f"""
 select
     A.year,
@@ -274,29 +274,61 @@ from (
         geoid = self.get_decade(geoid)
         tbl = f'{attr}.{self.state.abbr}_{geoid}'
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
+            sel_pop = ut.make_select([f'sum({x}) as {x}' for x in subpops.keys()])
+            sel_den = ut.make_select([f'sum({x}) / greatest(1, sum(aland)) as {x.replace("pop", "den")}' for x in subpops.keys()])
+            sel_geo = ut.make_select([f'sum({x}) as {x}' for x in ['aland', 'awater', 'atot']])
+            qry = f"""
+select
+    {geoid},
+    {sel_pop},
+    {sel_den},
+    min(dist_to_border) as dist_to_border,
+    {sel_geo},
+    st_union_agg(geometry) as geometry,
+from {self.get_intersection()}
+group by {geoid}"""
             f = lambda x: f'join (select {geoid}, {x}, sum(all_tot_pop) as p from {self.get_intersection()} group by {geoid}, {x} qualify row_number() over (partition by {geoid} order by p desc) = 1) as {x}_tbl using ({geoid})'
             plan = ['county', *self.bq.get_cols(self.get_plan())[1:]]
             join_plan = ut.make_select([f(x) for x in plan], 2, '\n')
             sel_plan  = ut.join(plan)
-            sel_sum   = ut.make_select([f'sum({x}) as {x}' for x in [*subpops.keys(), 'aland', 'awater', 'atot']], 4)
+            sel_den = ut.make_select([f'{x} / greatest(1, aland) as {x.replace("pop", "den")}' for x in subpops.keys()])
             qry = f"""
-select * except (geometry), case when perim < 0.1 then 0 else 4 * {np.pi} * atot / (perim * perim) end as polsby_popper, geometry,
+select
+    {geoid},
+    {sel_plan},
+    A.* except ({geoid}),
+    st_perimeter(geometry) / 1000 as perim,
 from (
-    select *, st_perimeter(geometry) / 1000 as perim,
-    from (
-        select
-            {geoid},
-            {sel_plan},
-            A.* except ({geoid}),
-        from (
-            select
-                {geoid},
-                {sel_sum},
-                st_union_agg(geometry) as geometry,
-            from {self.get_intersection()}
-            group by {geoid}
-        ) as A
-        {join_plan}))"""
+    {ut.subquery(qry)}
+) as A
+{join_plan}"""
+            qry = f"""
+select
+    * except (geometry),
+    case when perim < 0.1 then 0 else 4 * {np.pi} * atot / (perim * perim) end as polsby_popper,
+    geometry,
+from (
+    {ut.subquery(qry)})"""
+
+            
+#             qry = f"""
+# select * except (geometry), case when perim < 0.1 then 0 else 4 * {np.pi} * atot / (perim * perim) end as polsby_popper, geometry,
+# from (
+#     select *, st_perimeter(geometry) / 1000 as perim,
+#     from (
+#         select
+#             {geoid},
+#             {sel_plan},
+#             A.* except ({geoid}),
+#         from (
+#             select
+#                 {geoid},
+#                 {sel_sum},
+#                 st_union_agg(geometry) as geometry,
+#             from {self.get_intersection()}
+#             group by {geoid}
+#         ) as A
+#         {join_plan}))"""
             self.qry_to_tbl(qry, tbl)
         return tbl
 
@@ -335,7 +367,7 @@ join {self.get_shape()['vtd2022']} as B on st_intersects(A.geometry, B.geometry)
 qualify areaint2022 = max(areaint2022) over (partition by block2010, block2020)"""
             sel_id  = ut.make_select([f'div(A.block{year}, {10**(15-self.levels[level])}) as {level}{year}' for level in self.levels.keys() for year in [2020, 2010]][::-1])
             sel_pop = ut.make_select([f'A.aprop2020 * B.{p} as {p}' for p in subpops.keys()])
-            sel_den = ut.make_select([f'A.aprop2020 * B.{p} / aland as {p.replace("pop", "den")}' for p in subpops.keys()])
+            sel_den = ut.make_select([f'A.aprop2020 * B.{p} / greatest(1, aland) as {p.replace("pop", "den")}' for p in subpops.keys()])
             qry = f"""
 select
     {sel_id},
