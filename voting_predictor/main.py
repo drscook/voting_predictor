@@ -308,7 +308,7 @@ group by {geoid}"""
             qry = f"""
 select
     {geoid},
-    {ut.join(sel_plan},
+    {ut.join(sel_plan)},
     A.* except ({geoid}),
     st_perimeter(geometry) / 1000 as perim,
 from (
