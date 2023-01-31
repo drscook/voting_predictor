@@ -246,25 +246,25 @@ from (
             feat_acs = self.bq.get_cols(tbl_src)[2:]
             feat_geo = ['dist_to_border', 'aland', 'awater', 'atot', 'perim', 'polsby_popper']
             f = lambda x: 'pop'+x[x.find('_'):]
-            sel_grp = ut.make_select([f'sum(A.{x} * I.{f(x)} / greatest(1, S.{f(x)})) as {x}' for x in feat_acs if not "all" in x])
-            sel_geo = ut.make_select([f'min(T.{x}) as {x}' for x in feat_geo])
+            sel_grp = [f'sum(A.{x} * I.{f(x)} / greatest(1, S.{f(x)})) as {x}' for x in feat_acs if not "all" in x]
+            sel_geo = [f'min(T.{x}) as {x}' for x in feat_geo]
             qry = f"""
 select
     A.year,
     T.{geoid_trg},
     T.county,
-    {sel_grp},
-    {sel_geo},
+    {ut.make_select(sel_grp)},
+    {ut.make_select(sel_geo)},
 from {tbl_src} as A
 join {self.get_intersection()} as I using ({geoid_src})
 join {self.get_geo(geoid_src)} as S using ({geoid_src})
 join {self.get_geo(geoid_trg)} as T using ({geoid_trg})
 group by 1,2,3"""
-            sel_all = ut.make_select([f'{x.replace("all", "hisp")} + {x.replace("all", "other")} + {x.replace("all", "white")} as {x}' for x in feat_acs if "all" in x])
+            sel_all = [f'{x.replace("all", "hisp")} + {x.replace("all", "other")} + {x.replace("all", "white")} as {x}' for x in feat_acs if "all" in x]
             qry = f"""
 select
     *,
-    {sel_all},
+    {ut.make_select(sel_all)},
 from (
     {ut.subquery(qry)})"""
             feat_den = [f'{x} / greatest(1, aland) as {x.replace("pop", "den")}' for x in subpops.keys()]
@@ -288,34 +288,34 @@ from (
         geoid = self.get_decade(geoid)
         tbl = f'{attr}.{self.state.abbr}_{geoid}'
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
-            sel_pop = ut.make_select([f'sum({x}) as {x}' for x in subpops.keys()])
-            sel_den = ut.make_select([f'sum({x}) / greatest(1, sum(aland)) as {x.replace("pop", "den")}' for x in subpops.keys()])
-            sel_geo = ut.make_select([f'sum({x}) as {x}' for x in ['aland', 'awater', 'atot']])
+            sel_pop = [f'sum({x}) as {x}' for x in subpops.keys()]
+            sel_den = [f'sum({x}) / greatest(1, sum(aland)) as {x.replace("pop", "den")}' for x in subpops.keys()]
+            sel_geo = [f'sum({x}) as {x}' for x in ['aland', 'awater', 'atot']]
             qry = f"""
 select
     {geoid},
-    {sel_den},
-    {sel_pop},
+    {ut.make_select(sel_den)},
+    {ut.make_select(sel_pop)},
     min(dist_to_border) as dist_to_border,
-    {sel_geo},
+    {ut.make_select(sel_geo)},
     st_union_agg(geometry) as geometry,
 from {self.get_intersection()}
 group by {geoid}"""
             f = lambda x: f'join (select {geoid}, {x}, sum(pop_tot_all) as p from {self.get_intersection()} group by {geoid}, {x} qualify row_number() over (partition by {geoid} order by p desc) = 1) as {x}_tbl using ({geoid})'
-            plan = ['county', *self.bq.get_cols(self.get_plan())[1:]]
-            join_plan = ut.make_select([f(x) for x in plan], 2, '\n')
-            sel_plan  = ut.join(plan)
-            sel_den = ut.make_select([f'{x} / greatest(1, aland) as {x.replace("pop", "den")}' for x in subpops.keys()])
+            sel_plan = ['county', *self.bq.get_cols(self.get_plan())[1:]]
+            join_plan = [f(x) for x in sel_plan]
+#             sel_plan  = ut.join(plan)
+            sel_den = [f'{x} / greatest(1, aland) as {x.replace("pop", "den")}' for x in subpops.keys()]
             qry = f"""
 select
     {geoid},
-    {sel_plan},
+    {ut.make_select(sel_plan},
     A.* except ({geoid}),
     st_perimeter(geometry) / 1000 as perim,
 from (
     {ut.subquery(qry)}
 ) as A
-{join_plan}"""
+{ut.make_select(join_plan)}"""
             qry = f"""
 select
     * except (geometry),
@@ -359,18 +359,18 @@ from (
 ) as A
 join {self.get_shape()['vtd2022']} as B on st_intersects(A.geometry, B.geometry)
 qualify areaint2022 = max(areaint2022) over (partition by block2010, block2020)"""
-            sel_id  = ut.make_select([f'div(A.block{year}, {10**(15-self.levels[level])}) as {level}{year}' for level in self.levels.keys() for year in [2020, 2010]][::-1])
-            sel_pop = ut.make_select([f'A.aprop2020 * B.{p} as {p}' for p in subpops.keys()])
-            sel_den = ut.make_select([f'A.aprop2020 * B.{p} / greatest(1, aland) as {p.replace("pop", "den")}' for p in subpops.keys()])
+            sel_id  = [f'div(A.block{year}, {10**(15-self.levels[level])}) as {level}{year}' for level in self.levels.keys() for year in [2020, 2010]][::-1]
+            sel_pop = [f'A.aprop2020 * B.{p} as {p}' for p in subpops.keys()]
+            sel_den = [f'A.aprop2020 * B.{p} / greatest(1, aland) as {p.replace("pop", "den")}' for p in subpops.keys()]
             qry = f"""
 select
-    {sel_id},
+    {ut.make_select(sel_id)},
     vtd2020,
     vtd2022,
     county,
     C.* except (block2020),
-    {sel_den},
-    {sel_pop},
+    {ut.make_select(sel_den)},
+    {ut.make_select(sel_pop)},
     st_distance(A.geometry, (select st_boundary(us_outline_geom) from bigquery-public-data.geo_us_boundaries.national_outline)) as dist_to_border,
     aland,
     awater,
