@@ -269,14 +269,14 @@ select
     {sel_all},
 from (
     {ut.subquery(qry)})"""
-select
-    *,
-    {sel_all},
-from (
-    {ut.subquery(qry)})"""
+# select
+#     *,
+#     {sel_all},
+# from (
+#     {ut.subquery(qry)})"""
 
             
-#             qry = f"""
+# #             qry = f"""
 # select
 #     year,
 #     {geoid},
