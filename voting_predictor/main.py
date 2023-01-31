@@ -351,7 +351,6 @@ select
     awater,
     st_area(A.geometry) / 1000  / 1000 as atot,
     st_perimeter(A.geometry) / 1000 as perim,
-    case when perim < 0.1 then 0 else 4 * {np.pi} * atot / (perim * perim) end as polsby_popper,
     geometry,
 from (
     {ut.subquery(qry)}
