@@ -475,14 +475,11 @@ from (
             with Timer():
                 self.rpt(tbl)
                 repl = {v:k for k,v in subpops.items() if v}
-                print(repl)
                 df = self.fetch_census(fields=['name', *repl.keys()], dataset='pl', year=year, level='block').rename(columns=repl)
-                print(df.columns)
                 self.compute_other(df, 'pop_tot_other')
                 self.compute_other(df, 'pop_vap_other')
                 county = df['name'].str.split(', ', expand=True)[3].str[:-7]
                 df['county'] = df['name'].str.split(', ', expand=True)[3].str[:-7]
-                print(df.columns)
                 self.df_to_tbl(df, tbl, cols=[geoid, 'county', *subpops.keys()])
         return tbl
 
