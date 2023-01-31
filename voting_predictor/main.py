@@ -160,16 +160,16 @@ from (
                 qry = f"""
 select
     *,
-    dem_votes / greatest(1, tot_votes) as dem_prop,
-    rep_votes / greatest(1, tot_votes) as rep_prop,
+    votes_dem / greatest(1, tot_votes) as prop_dem,
+    votes_rep / greatest(1, tot_votes) as prop_rep,
 from (
     select 
         * except (D, R),
         "{campaign}" as campaign,
         "{candidates}" as candidates,
-        coalesce(B.D, 0) as dem_votes,
-        coalesce(B.R, 0) as rep_votes,
-        coalesce(B.D, 0) + coalesce(B.R, 0) as tot_votes,
+        coalesce(B.D, 0) as votes_dem,
+        coalesce(B.R, 0) as votes_rep,
+        coalesce(B.D, 0) + coalesce(B.R, 0) as votes_tot,
     from {self.get_acs(year)} as A
     left join (
         select {geoid}, party, votes,
