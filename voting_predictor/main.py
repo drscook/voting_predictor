@@ -267,7 +267,7 @@ select
     {ut.select(sel_all)},
 from (
     {ut.subquery(qry)})"""
-            feat_den = [f'{x} / greatest(1, aland * 1000000) as {x.replace("pop", "den")}' for x in subpops.keys()]
+            feat_den = [f'{x} / greatest(1, aland) * 1000000 as {x.replace("pop", "den")}' for x in subpops.keys()]
             qry = f"""
 select
     year,
@@ -289,7 +289,7 @@ from (
         tbl = f'{attr}.{self.state.abbr}_{geoid}'
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
             sel_pop = [f'sum({x}) as {x}' for x in subpops.keys()]
-            sel_den = [f'sum({x}) / greatest(1, sum(aland) * 1000000) as {x.replace("pop", "den")}' for x in subpops.keys()]
+            sel_den = [f'sum({x}) / greatest(1, sum(aland)) * 1000000 as {x.replace("pop", "den")}' for x in subpops.keys()]
             sel_geo = [f'sum({x}) as {x}' for x in ['aland', 'awater', 'atot']]
             qry = f"""
 select
@@ -359,7 +359,7 @@ join {self.get_shape()['vtd2022']} as B on st_intersects(A.geometry, B.geometry)
 qualify areaint2022 = max(areaint2022) over (partition by block2010, block2020)"""
             sel_id  = [f'div(A.block{year}, {10**(15-self.levels[level])}) as {level}{year}' for level in self.levels.keys() for year in [2020, 2010]][::-1]
             sel_pop = [f'A.aprop2020 * B.{p} as {p}' for p in subpops.keys()]
-            sel_den = [f'A.aprop2020 * B.{p} / greatest(1, aland * 1000000) as {p.replace("pop", "den")}' for p in subpops.keys()]
+            sel_den = [f'A.aprop2020 * B.{p} / greatest(1, aland) * 1000000 as {p.replace("pop", "den")}' for p in subpops.keys()]
             qry = f"""
 select
     {ut.select(sel_id)},
