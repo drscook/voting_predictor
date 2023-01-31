@@ -1,16 +1,3 @@
-levels = {
-    'state':2,
-    'county':3,
-    'tract':6,
-    'block_group':1,
-    'block':4,
-}
-crs = {
-    'census'  : 'EPSG:4269'  , # degrees - used by Census
-    'bigquery': 'EPSG:4326'  , # WSG84 - used by Bigquery
-    'area'    : 'ESRI:102003', # meters
-    'length'  : 'ESRI:102005', # meters
-}
 subpops = {
     'all_tot_pop'  : 'p2_001n',
     'all_vap_pop'  : 'p4_001n',
@@ -198,6 +185,3 @@ features = {
     'hisp_vap_spanishathome': ['b16004_026e'],
     'hisp_vap_spanishathomeenglishwell': ['b16004_027e', 'b16004_028e'],
 }
-
-F = {f[f.find('_'):] for f in features.keys()}
-features_universal = {f[1:] for f in F if 'all'+f in features.keys() and 'white'+f in features.keys() and 'hisp'+f in features.keys()}
