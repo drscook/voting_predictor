@@ -308,7 +308,7 @@ select
     st_union_agg(geometry) as geometry,
 from {self.get_intersection()}
 group by {geoid}"""
-            f = lambda x: f'join (select {geoid}, {x}, sum(all_tot_pop) as p from {self.get_intersection()} group by {geoid}, {x} qualify row_number() over (partition by {geoid} order by p desc) = 1) as {x}_tbl using ({geoid})'
+            f = lambda x: f'join (select {geoid}, {x}, sum(pop_tot_all) as p from {self.get_intersection()} group by {geoid}, {x} qualify row_number() over (partition by {geoid} order by p desc) = 1) as {x}_tbl using ({geoid})'
             plan = ['county', *self.bq.get_cols(self.get_plan())[1:]]
             join_plan = ut.make_select([f(x) for x in plan], 2, '\n')
             sel_plan  = ut.join(plan)
