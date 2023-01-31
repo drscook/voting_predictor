@@ -239,22 +239,10 @@ from (
                         if not fields:
                             self.compute_other(df, name)
                     self.df_to_tbl(df, tbl_src, cols=['year', geoid_src, *features.keys()])    
-#                     df = df[['year', geoid_src, *features.keys()]]
-#                     for x in features.keys():
-#                         if 'all' in x:
-#                             self.compute_other(df, x)
-#                     self.df_to_tbl(df, tbl_src, cols=['year', geoid_src, *features.keys()])
             feat_acs = self.bq.get_cols(tbl_src)[2:]
-#             feat_all = [x for x in feat if x[:3] == 'all']
-#             feat_grp = [x for x in feat if x not in feat_all]
-#             feat_grp = [x for x in feat if x[:3] != 'all']
-#             feat_all = [x[4:] for x in feat if x not in feat_grp]
-            
             feat_geo = ['aland', 'awater', 'atot', 'perim', 'polsby_popper']
-#             f = lambda x: x[:ut.findn(x, '_', 2)]+'_pop'
             f = lambda x: 'pop'+x[x.find('_'):]
             sel_grp = ut.make_select([f'sum(A.{x} * B.{f(x)} / greatest(1, C.{f(x)})) as {x}' for x in feat_acs if not "all" in x])
-#             sel_geo  = ut.make_select([f'min(C.{x}) as {x}' for x in feat_geo])
             sel_geo  = ut.make_select([f'min(C.{x}) as {x}' for x in feat_geo])
             qry = f"""
 select
