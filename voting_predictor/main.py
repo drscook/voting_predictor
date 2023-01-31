@@ -172,7 +172,7 @@ from (
         coalesce(D, 0) as vote_dem,
         coalesce(R, 0) as vote_rep,
         coalesce(D, 0) + coalesce(R, 0) as vote_tot,
-    from {self.get_acs(year=min(year, datetime.date.today().year-2))} as A
+    from {self.get_acs(level='tract', year=min(year, datetime.date.today().year-2), geoid_trg=geoid)} as A
     left join (
         select {geoid}, midterm, federal, party, votes,
         from {self.get_election()}
@@ -219,14 +219,14 @@ from (
         return tbl
 
 
-    def get_acs(self, year=2018, level='tract', geoid='vtd2022'):
-        attr = 'acs'
-        attr_src = f'{attr}_src'
-        tbl_src  = f'{attr}.{self.state.abbr}_{level}{year}'
-        tbl = f'{tbl_src}_{geoid}'
+    def get_acs(self, year=2018, level='tract', geoid_trg='vtd2022'):
+        attr_trg = 'acs'
+        attr_src = f'{attr_trg}_src'
+        tbl_src  = f'{attr_trg}.{self.state.abbr}_{level}{year}'
+        tbl_trg  = f'{tbl_src}_{geoid_trg}'
         path, level, year, decade = self.parse(tbl_src)
         geoid_src = f'{level}{decade}'
-        if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
+        if not self.bq.get_tbl(tbl_trg, overwrite=(attr_trg in self.refresh) & (tbl_trg not in self.tbls)):
             if not self.bq.get_tbl(tbl_src, overwrite=(attr_src in self.refresh) & (tbl_src not in self.tbls)):
                 with Timer():
                     self.rpt(tbl_src)
@@ -246,18 +246,19 @@ from (
             feat_acs = self.bq.get_cols(tbl_src)[2:]
             feat_geo = ['dist_to_border', 'aland', 'awater', 'atot', 'perim', 'polsby_popper']
             f = lambda x: 'pop'+x[x.find('_'):]
-            sel_grp = ut.make_select([f'sum(A.{x} * B.{f(x)} / greatest(1, C.{f(x)})) as {x}' for x in feat_acs if not "all" in x])
-            sel_geo  = ut.make_select([f'min(C.{x}) as {x}' for x in feat_geo])
+            sel_grp = ut.make_select([f'sum(A.{x} * I.{f(x)} / greatest(1, S.{f(x)})) as {x}' for x in feat_acs if not "all" in x])
+            sel_geo = ut.make_select([f'min(T.{x}) as {x}' for x in feat_geo])
             qry = f"""
 select
     A.year,
-    B.{geoid},
-    B.county,
+    T.{geoid_trg},
+    T.county,
     {sel_grp},
     {sel_geo},
 from {tbl_src} as A
-join {self.get_intersection()} as B using ({geoid_src})
-join {self.get_geo(geoid_src)} as C using ({geoid_src})
+join {self.get_intersection()} as I using ({geoid_src})
+join {self.get_geo(geoid_src)} as S using ({geoid_src})
+join {self.get_geo(geoid_trg)} as T using ({geoid_trg})
 group by 1,2,3"""
             sel_all = ut.make_select([f'{x.replace("all", "hisp")} + {x.replace("all", "other")} + {x.replace("all", "white")} as {x}' for x in feat_acs if "all" in x])
             qry = f"""
@@ -278,8 +279,8 @@ select
     {ut.make_select(feat_geo)},
 from (
     {ut.subquery(qry)})"""
-            self.qry_to_tbl(qry, tbl)
-        return tbl
+            self.qry_to_tbl(qry, tbl_trg)
+        return tbl_trg
 
 
     def get_geo(self, geoid='tract2010'):
