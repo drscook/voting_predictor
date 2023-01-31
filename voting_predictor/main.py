@@ -314,7 +314,7 @@ select
 from (
     {ut.subquery(qry)}
 ) as A
-{ut.select(join_plan)}"""
+{ut.join(join_plan, '\n')}"""
             qry = f"""
 select
     * except (geometry),
