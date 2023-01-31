@@ -269,7 +269,7 @@ from (
         return tbl
 
 
-    def get_geo(self, geoid):
+    def get_geo(self, geoid='tract2010'):
         attr = 'geo'
         geoid = self.get_decade(geoid)
         tbl = f'{attr}.{self.state.abbr}_{geoid}'
