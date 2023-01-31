@@ -328,9 +328,6 @@ select
     B.vtd2022,
     A.*,
     st_area(st_intersection(A.geometry, B.geometry)) as areaint2022,
-    st_distance(A.geometry, (select st_boundary(us_outline_geom) from bigquery-public-data.geo_us_boundaries.national_outline)) as dist_to_border,
-    st_area(A.geometry) / 1000  / 1000 as atot,
-    st_perimeter(A.geometry) / 1000 as perim,
 from (
     {ut.subquery(qry)}
 ) as A
@@ -338,6 +335,7 @@ join {self.get_shape()['vtd2022']} as B on st_intersects(A.geometry, B.geometry)
 qualify areaint2022 = max(areaint2022) over (partition by block2010, block2020)"""
             sel_id  = ut.make_select([f'div(A.block{year}, {10**(15-self.levels[level])}) as {level}{year}' for level in self.levels.keys() for year in [2020, 2010]][::-1])
             sel_pop = ut.make_select([f'A.aprop2020 * B.{p} as {p}' for p in subpops.keys()])
+            sel_den = ut.make_select([f'A.aprop2020 * B.{p} / aland as {p.replace("pop", "den")}' for p in subpops.keys()])
             qry = f"""
 select
     {sel_id},
@@ -346,11 +344,13 @@ select
     county,
     C.* except (block2020),
     {sel_pop},
-    aprop2020,
+    {sel_den},
+    --aprop2020,
+    st_distance(A.geometry, (select st_boundary(us_outline_geom) from bigquery-public-data.geo_us_boundaries.national_outline)) as dist_to_border,
     aland,
     awater,
-    atot,
-    perim,
+    st_area(A.geometry) / 1000  / 1000 as atot,
+    st_perimeter(A.geometry) / 1000 as perim,
     case when perim < 0.1 then 0 else 4 * {np.pi} * atot / (perim * perim) end as polsby_popper,
     geometry,
 from (
@@ -358,6 +358,15 @@ from (
 ) as A
 join {self.get_census()} as B using(block2020)
 join {self.get_plan()} as C using(block2020)"""
+            qry = f"""
+select
+    * except (geometry),
+    case when perim < 0.1 then 0 else 4 * {np.pi} * atot / (perim * perim) end as polsby_popper,
+    geometry,
+from (
+    {ut.subquery(qry)})"""
+
+
             self.qry_to_tbl(qry, tbl)
         return tbl
 
