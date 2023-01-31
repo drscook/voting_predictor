@@ -240,7 +240,7 @@ from (
                             self.compute_other(df, name)
                     self.df_to_tbl(df, tbl_src, cols=['year', geoid_src, *features.keys()])    
             feat_acs = self.bq.get_cols(tbl_src)[2:]
-            feat_geo = ['aland', 'awater', 'atot', 'perim', 'polsby_popper']
+            feat_geo = ['dist_to_border', 'aland', 'awater', 'atot', 'perim', 'polsby_popper']
             f = lambda x: 'pop'+x[x.find('_'):]
             sel_grp = ut.make_select([f'sum(A.{x} * B.{f(x)} / greatest(1, C.{f(x)})) as {x}' for x in feat_acs if not "all" in x])
             sel_geo  = ut.make_select([f'min(C.{x}) as {x}' for x in feat_geo])
