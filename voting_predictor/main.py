@@ -167,9 +167,9 @@ from (
         * except (D, R),
         "{campaign}" as campaign,
         "{candidates}" as candidates,
-        coalesce(B.D, 0) as votes_dem,
-        coalesce(B.R, 0) as votes_rep,
-        coalesce(B.D, 0) + coalesce(B.R, 0) as votes_tot,
+        coalesce(D, 0) as votes_dem,
+        coalesce(R, 0) as votes_rep,
+        coalesce(D, 0) + coalesce(R, 0) as votes_tot,
     from {self.get_acs(year)} as A
     left join (
         select {geoid}, party, votes,
