@@ -271,7 +271,7 @@ from (
             qry = f"""
 select
     year,
-    {geoid},
+    {geoid_trg},
     county,
     ntile(3) over (order by {feat_den[0].split(' as ')[0]} asc) as urbanization,
     {ut.select(feat_den)},
