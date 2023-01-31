@@ -156,7 +156,8 @@ from (
             L = []
             for campaign, candidates in campaigns:
                 office, year = campaign.split('_')
-                year = min(int(year), datetime.date.today().year-2)
+                year = int(year)
+#                 year = min(int(year), datetime.date.today().year-2)
                 qry = f"""
 select
     *,
@@ -171,7 +172,7 @@ from (
         coalesce(D, 0) as vote_dem,
         coalesce(R, 0) as vote_rep,
         coalesce(D, 0) + coalesce(R, 0) as vote_tot,
-    from {self.get_acs(year)} as A
+    from {self.get_acs(year=min(year, datetime.date.today().year-2))} as A
     left join (
         select {geoid}, party, votes,
         from {self.get_election()}
@@ -212,12 +213,12 @@ from (
                             df['election'] = ut.join(a[1:-2], '_')
                             df['name'] = ut.replace(df['name'], repl)
                             df['incumbent'] = df['incumbent'] == 'Y'
-                            ut.pprint(df.head(3))                            
-                            df = df.loc[mask, cols]
-                            ut.pprint(df.head(3))
-                            assert 1==2
+#                             ut.pprint(df.head(3))                            
+#                             df = df.loc[mask, cols]
+#                             ut.pprint(df.head(3))
+#                             assert 1==2
 
-                            L.append()
+                            L.append(df.loc[mask, cols])
                                       
                 df = ut.prep(pd.concat(L, axis=0)).reset_index(drop=True)
                 self.df_to_tbl(df, tbl)
