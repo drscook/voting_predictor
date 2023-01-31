@@ -169,8 +169,6 @@ from (
         * except (D, R),
         "{campaign}" as campaign,
         "{candidates}" as candidates,
-        {('President' in campaign) | ('USSen' in campaign)} as federal,
-        {year%4==2} as midterm,
         coalesce(D, 0) as vote_dem,
         coalesce(R, 0) as vote_rep,
         coalesce(D, 0) + coalesce(R, 0) as vote_tot,
@@ -200,7 +198,7 @@ from (
                 url = f'https://data.capitol.texas.gov/dataset/35b16aee-0bb0-4866-b1ec-859f1f044241/resource/b9ebdbdb-3e31-4c98-b158-0e2993b05efc/download/{zip_file.name}'
                 download(zip_file, url)
                 L = []
-                cols = [self.geoid, 'office', 'year', 'election', 'name', 'party', 'incumbent', 'votes']                    
+                cols = [self.geoid, 'year', 'office', 'federal', 'election', 'name', 'party', 'incumbent', 'votes']                    
                 for file in path.iterdir():
                     a = ut.prep(file.stem.split('_'))
                     if ('general' in a) & ('returns' in a):
@@ -208,8 +206,10 @@ from (
                         mask = (df['votes'] > 0) & (df['party'].isin(('R', 'D', 'L', 'G')))
                         if mask.any():
                             repl = {(' ', '.', ','): ''}
-                            df['office'] = ut.replace(df['office'], repl)
                             df['year'] = int(a[0])
+                            df['midterm'] = (df['year']%4)==2
+                            df['office'] = ut.replace(df['office'], repl)
+                            df['federal'] = df['office'].str.contains('President|USSen|USRep')
                             df['election'] = ut.join(a[1:-2], '_')
                             df['name'] = ut.replace(df['name'], repl)
                             df['incumbent'] = df['incumbent'] == 'Y'
