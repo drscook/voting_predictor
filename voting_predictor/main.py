@@ -161,7 +161,7 @@ from (
                 qry = f"""
 select
     *,
-    vote_tot / greatest(1, pop_tot_all) as vote_rate,
+    vote_tot / greatest(1, pop_vap_all) as vote_rate,
     vote_dem / greatest(1, vote_tot) as pref_dem,
     vote_rep / greatest(1, vote_tot) as pref_rep,
 from (
@@ -172,7 +172,7 @@ from (
         coalesce(D, 0) as vote_dem,
         coalesce(R, 0) as vote_rep,
         coalesce(D, 0) + coalesce(R, 0) as vote_tot,
-    from {self.get_acs(level='tract', year=min(year+1, datetime.date.today().year-2), geoid_trg=geoid)} as A
+    from {self.get_acs(level='tract', year=min(year, datetime.date.today().year-2), geoid_trg=geoid)} as A
     left join (
         select {geoid}, midterm, federal, party, votes,
         from {self.get_election()}
