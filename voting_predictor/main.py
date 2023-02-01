@@ -96,8 +96,8 @@ class Voting():
             for col in [lev, f'{lev}_{decade}']:
                 if (col in df.columns) & (j <= k):
                     df[geoid] += ut.rjust(df[col], j-i)
+                    i = j
                     break
-            i = j
         return geoid
 
     def fetch_census(self, fields, dataset='acs5', level='tract', year=2020):
