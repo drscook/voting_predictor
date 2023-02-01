@@ -134,6 +134,8 @@ class Voting():
         self.bq.df_to_tbl(ut.prep(df[cols]), tbl)
         self.tbls.add(tbl)
 
+    def qry_to_df(self, qry):
+        return self.bq.qry_to_df(qry)
 
     def get_final(self):
         if (self.state.abbr != 'TX') or (self.level != 'vtd'):
