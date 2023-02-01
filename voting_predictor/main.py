@@ -318,6 +318,7 @@ from (
 select
     * except (geometry),
     case when perim < 0.1 then 0 else 4 * {np.pi} * atot / (perim * perim) end as polsby_popper,
+    st_centroid(geometry) as point,
     geometry,
 from (
     {ut.subquery(qry)})"""
@@ -384,6 +385,7 @@ join {self.get_plan()} as C using(block2020)"""
 select
     * except (geometry),
     case when perim < 0.1 then 0 else 4 * {np.pi} * atot / (perim * perim) end as polsby_popper,
+    st_centroid(geometry) as point,
     geometry,
 from (
     {ut.subquery(qry)})"""
