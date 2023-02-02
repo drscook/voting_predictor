@@ -182,7 +182,7 @@ from (
     ) as B using ({geoid}))"""
                 L.append(qry)   
             qry = ut.join(L, '\nunion all\n')
-            self.qry_to_tbl(qry, tbl)
+            self.qry_to_tbl(qry, tbl, True)
         return tbl
 
 
