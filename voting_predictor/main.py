@@ -28,7 +28,8 @@ class Voting():
     state: str = 'TX'
     geoid: str = 'vtd2022'
     root_path:str = '/content/'
-    refresh: tuple = () 
+    refresh: tuple = ()
+    urbanizations: int = 3
     
     def split_geoid(self, geoid):
         return geoid[:-4], int(geoid[-4:])
@@ -171,7 +172,7 @@ select
     (ifnull(D,0) + ifnull(R,0)) / greatest(1, pop_vap_all) as vote_rate,
     ifnull(D,0) / greatest(1, ifnull(D,0) + ifnull(R,0)) as pref_dem,
     ifnull(R,0) / greatest(1, ifnull(D,0) + ifnull(R,0)) as pref_rep,
-    ntile(3) over (order by den_tot_all asc) as urbanization,
+    ntile({self.urbanizations}) over (order by den_tot_all asc) as urbanization,
     A.* except ({geoid}),
 from {self.get_acs(level='tract', year=min(year, datetime.date.today().year-2), geoid_trg=geoid)} as A
 left join (
