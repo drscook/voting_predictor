@@ -308,8 +308,8 @@ from (
         from (
             select
                 {geoid},
-                {ut.select(sel_pop, 4)},
                 {ut.select(sel_den, 4)},
+                {ut.select(sel_pop, 4)},
                 sum(A.aland) as aland,
                 sum(A.awater) as awater,
                 st_union_agg(B.geometry) as geometry,
@@ -336,8 +336,8 @@ select
     {ut.select(sel_id)},
     {ut.select(sel_vtd)},
     county,
-    {ut.select(sel_pop)},
     {ut.select(sel_den)},
+    {ut.select(sel_pop)},
     aland,
     awater,
     plan.* except({geoid}),
