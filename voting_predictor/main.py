@@ -246,41 +246,78 @@ from (
                             self.compute_other(df, name)
                     self.df_to_tbl(df, tbl_src, cols=['year', geoid_src, *features.keys()])    
             feat_acs = self.bq.get_cols(tbl_src)[2:]
-            feat_geo = ['dist_to_border', 'aland', 'awater', 'atot', 'perim', 'polsby_popper']
+            
+            sel_geo = {x:f'min(T.{x}) as {x}' for x in ['dist_to_border', 'aland', 'awater', 'atot', 'perim', 'polsby_popper']}
+            
+#             feat_geo = ['dist_to_border', 'aland', 'awater', 'atot', 'perim', 'polsby_popper']
             f = lambda x: 'pop'+x[x.find('_'):]
-            sel_grp = [f'sum(A.{x} * I.{f(x)} / greatest(1, S.{f(x)})) as {x}' for x in feat_acs if not "all" in x]
-            sel_geo = [f'min(T.{x}) as {x}' for x in feat_geo]
-            qry = f"""
-select
-    A.year,
-    T.{geoid_trg},
-    T.county,
-    {ut.select(sel_geo)},
-    {ut.select(sel_grp)},
-from {tbl_src} as A
-join {self.get_intersection()} as I using ({geoid_src})
-join {self.get_geo(geoid_src)} as S using ({geoid_src})
-join {self.get_geo(geoid_trg)} as T using ({geoid_trg})
-group by 1,2,3"""
-            sel_all = [f'{x.replace("all", "hisp")} + {x.replace("all", "other")} + {x.replace("all", "white")} as {x}' for x in feat_acs if "all" in x]
-            qry = f"""
-select
-    *,
-    {ut.select(sel_all)},
-from (
-    {ut.subquery(qry)})"""
-            feat_den = [f'{x} / greatest(1, aland) * 1000000 as {x.replace("pop", "den")}' for x in subpops.keys()]
+            sel_grp = {x:f'sum(A.{x} * I.{f(x)} / greatest(1, S.{f(x)})) as {x}' for x in feat_acs if not "all" in x}
+#             sel_geo = [f'min(T.{x}) as {x}' for x in feat_geo]
+            sel_all = {x:f'{x.replace("all", "hisp")} + {x.replace("all", "other")} + {x.replace("all", "white")} as {x}' for x in feat_acs if "all" in x}
+            sel_den = {x:f'{x} / greatest(1, aland) * 1000000 as {x.replace("pop", "den")}' for x in subpops.keys()}
+            
             qry = f"""
 select
     year,
     {geoid_trg},
     county,
-    {ut.select(feat_geo)},
-    ntile(3) over (order by {feat_den[0].split(' as ')[0]} asc) as urbanization,
-    {ut.select(feat_den)},
+    {ut.select(sel_geo.keys())},
+    ntile(3) over (order by den_tot_all asc) as urbanization,
+    {ut.select(sel_den.keys())},
     {ut.select(feat_acs)},
 from (
-    {ut.subquery(qry)})"""
+    select
+        *,
+        {ut.select(sel_den.values(), 2)},
+    from (
+        select
+            *,
+            {ut.select(sel_all.values(), 3)},
+        from (
+            select
+                A.year,
+                T.{geoid_trg},
+                T.county,
+                {ut.select(sel_geo.values(), 4)},
+                {ut.select(sel_grp.values(), 4)},
+            from {tbl_src} as A
+            join {self.get_intersection()} as I using ({geoid_src})
+            join {self.get_geo(geoid_src)} as S using ({geoid_src})
+            join {self.get_geo(geoid_trg)} as T using ({geoid_trg})
+            group by 1,2,3)))"""
+            
+            
+#             qry = f"""
+# select
+#     A.year,
+#     T.{geoid_trg},
+#     T.county,
+#     {ut.select(sel_geo)},
+#     {ut.select(sel_grp)},
+# from {tbl_src} as A
+# join {self.get_intersection()} as I using ({geoid_src})
+# join {self.get_geo(geoid_src)} as S using ({geoid_src})
+# join {self.get_geo(geoid_trg)} as T using ({geoid_trg})
+# group by 1,2,3"""
+#             sel_all = [f'{x.replace("all", "hisp")} + {x.replace("all", "other")} + {x.replace("all", "white")} as {x}' for x in feat_acs if "all" in x]
+#             qry = f"""
+# select
+#     *,
+#     {ut.select(sel_all)},
+# from (
+#     {ut.subquery(qry)})"""
+#             feat_den = [f'{x} / greatest(1, aland) * 1000000 as {x.replace("pop", "den")}' for x in subpops.keys()]
+#             qry = f"""
+# select
+#     year,
+#     {geoid_trg},
+#     county,
+#     {ut.select(feat_geo)},
+#     ntile(3) over (order by {feat_den[0].split(' as ')[0]} asc) as urbanization,
+#     {ut.select(feat_den)},
+#     {ut.select(feat_acs)},
+# from (
+#     {ut.subquery(qry)})"""
             self.qry_to_tbl(qry, tbl_trg)
         return tbl_trg
 
@@ -295,16 +332,8 @@ from (
             block = f'block{decade}'
             sel_pop = {x:f'sum({x}) as {x}' for x in subpops.keys()}
             sel_den = {x.replace("pop", "den"):f'{x} / greatest(1, aland) * 1000000 as {x.replace("pop", "den")}' for x in subpops.keys()}
-            
-#             sel_pop = [f'sum({x}) as {x}' for x in subpops.keys()]
-#             sel_den = [f'sum({x}) / greatest(1, sum(A.aland)) * 1000000 as {x.replace("pop", "den")}' for x in subpops.keys()]
-#             sel_plan = self.bq.get_cols(self.get_plan())[1:]
-            sel_geo = ['dist_to_border', 'aland', 'awater', 'atot', 'perim']
+#             sel_geo = ['dist_to_border', 'aland', 'awater', 'atot', 'perim']
             f = lambda x: f'join (select {geoid}, {x}, sum(pop_tot_all) as p from {self.get_intersection()} group by 1, 2 qualify row_number() over (partition by {geoid} order by p desc) = 1) using ({geoid})'
-#             f = lambda x: f'join (select * except (p) from (select {geoid}, {x}, sum(pop_tot_all) as p from {self.get_intersection()} group by 1, 2 qualify row_number() over (partition by {geoid} order by p desc) = 1)) using ({geoid})'
-#             join_plan = ut.join([f(x) for x in ['county', *self.bq.get_cols(self.get_plan())[1:]]], '\n')
-#             join_plan = ut.join([f(x) for x in self.bq.get_cols(self.get_plan())[1:]], '\n')
-#             join_plan = ut.join([f(x) for x in sel_plan], '\n')
             sel_plan = {x:f(x) for x in self.bq.get_cols(self.get_plan())[1:]}
     
     
