@@ -271,31 +271,6 @@ from (
         join {self.get_geo(geoid_src)} as S using ({geoid_src})
         join {self.get_geo(geoid_trg)} as T using ({geoid_trg})
         group by 1,2,3))"""
-
-#             qry = f"""
-# select
-#     year, {geoid_trg}, county,
-#     {ut.join(sel_geo.keys())},
-#     {ut.join(sel_den.keys())},
-#     {ut.join(feat_acs)},
-# from (
-#     select
-#         *,
-#         {ut.select(sel_den.values(), 2)},
-#     from (
-#         select
-#             *,
-#             {ut.select(sel_all.values(), 3)},
-#         from (
-#             select
-#                 A.year, T.{geoid_trg}, T.county,
-#                 {ut.select(sel_geo.values(), 4)},
-#                 {ut.select(sel_grp.values(), 4)},
-#             from {tbl_src} as A
-#             join {self.get_intersection()} as I using ({geoid_src})
-#             join {self.get_geo(geoid_src)} as S using ({geoid_src})
-#             join {self.get_geo(geoid_trg)} as T using ({geoid_trg})
-#             group by 1,2,3)))"""
             self.qry_to_tbl(qry, tbl_trg)
         return tbl_trg
 
@@ -416,7 +391,9 @@ join (
                 download(zip_file, url)
                 txt = zip_file.with_name(f'{zip_file.stem}_{self.state.abbr}.txt'.lower())
                 repl = {'blk_2010': 'block_2010', 'blk_2020': 'block_2020', 'arealand_int': 'aland', 'areawater_int':'awater'}
-                df = ut.prep(pd.read_csv(txt, sep='|')).rename(columns=repl)
+                df = ut.prep(pd.read_csv(txt, sep='|')).rename(columns=repl).query(f'state_2010=={self.state.fips} & state_2020=={self.state.fips}')
+                mask = (df['state_2010']==self.state.fips) & (df['state_2020']==self.state.fips)
+                print((~mask).sum())
                 print(df.dtypes)
                 assert 1==2
                 mask = df['state_2010']
