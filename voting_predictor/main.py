@@ -252,7 +252,7 @@ from (
             g = lambda x: 'pop'+x[x.find('_'):]
             sel_grp = {x:f'sum(A.{x} * I.{g(x)} / greatest(1, S.{g(x)})) as {x}' for x in feat_acs if not "all" in x}
             sel_all = {x:f'{x.replace("all", "hisp")} + {x.replace("all", "other")} + {x.replace("all", "white")} as {x}' for x in feat_acs if "all" in x}
-            sel_den = {x:f'{x} / greatest(1, aland) * 1000000 as {x.replace("pop", "den")}' for x in subpops.keys()}
+            sel_den = {x.replace("pop", "den"):f'{x} / greatest(1, aland) * 1000000 as {x.replace("pop", "den")}' for x in subpops.keys()}
             
             qry = f"""
 select
