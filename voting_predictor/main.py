@@ -318,6 +318,7 @@ from (
         tbl = f'{attr}.{self.state.abbr}_{geoid}'
 
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
+            assert 1==2
             path, level, year, decade = self.parse(tbl)
             block = f'block{decade}'
             sel_pop = {x:f'sum({x}) as {x}' for x in subpops.keys()}
@@ -329,7 +330,8 @@ from (
 
             qry = f"""
 select
-    {geoid}, county, dist_to_border, aland, awater, atot, perim, 4 * {np.pi} * atot / greatest(1, perim * perim) as polsby_popper,
+    {geoid}, county, dist_to_border, aland, awater, atot,
+    perim, 4 * {np.pi} * atot / greatest(1, perim * perim) as polsby_popper,
     {ut.join(sel_den.keys())},
     {ut.join(sel_pop.keys())},
     {ut.join(sel_plan.keys())},
