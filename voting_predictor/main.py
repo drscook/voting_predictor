@@ -182,7 +182,7 @@ left join (
 ) as B using ({geoid})"""
                 L.append(qry)
             qry = ut.join(L, 'union all\n')
-            self.qry_to_tbl(qry, tbl, True)
+            self.qry_to_tbl(qry, tbl)
         return tbl
 
 
@@ -250,7 +250,6 @@ left join (
             sel_all = {x:f'{x.replace("all", "hisp")} + {x.replace("all", "other")} + {x.replace("all", "white")} as {x}' for x in feat_acs if "all" in x}
             sel_den = {x.replace("pop", "den"):f'{x} / greatest(1, aland) * 1000000 as {x.replace("pop", "den")}' for x in subpops.keys()}
             sel_geo = {x:f'min(T.{x}) as {x}' for x in ['dist_to_border', 'aland', 'awater', 'atot', 'perim', 'polsby_popper']}
-            
             qry = f"""
 select
     year, {geoid_trg}, county,
@@ -296,7 +295,7 @@ from (
 #             join {self.get_geo(geoid_src)} as S using ({geoid_src})
 #             join {self.get_geo(geoid_trg)} as T using ({geoid_trg})
 #             group by 1,2,3)))"""
-            self.qry_to_tbl(qry, tbl_trg, True)
+            self.qry_to_tbl(qry, tbl_trg)
         return tbl_trg
 
 
