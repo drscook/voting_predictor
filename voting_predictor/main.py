@@ -275,39 +275,6 @@ from (
             join {self.get_geo(geoid_src)} as S using ({geoid_src})
             join {self.get_geo(geoid_trg)} as T using ({geoid_trg})
             group by 1,2,3)))"""
-            
-            
-#             qry = f"""
-# select
-#     A.year,
-#     T.{geoid_trg},
-#     T.county,
-#     {ut.select(sel_geo)},
-#     {ut.select(sel_grp)},
-# from {tbl_src} as A
-# join {self.get_intersection()} as I using ({geoid_src})
-# join {self.get_geo(geoid_src)} as S using ({geoid_src})
-# join {self.get_geo(geoid_trg)} as T using ({geoid_trg})
-# group by 1,2,3"""
-#             sel_all = [f'{x.replace("all", "hisp")} + {x.replace("all", "other")} + {x.replace("all", "white")} as {x}' for x in feat_acs if "all" in x]
-#             qry = f"""
-# select
-#     *,
-#     {ut.select(sel_all)},
-# from (
-#     {ut.subquery(qry)})"""
-#             feat_den = [f'{x} / greatest(1, aland) * 1000000 as {x.replace("pop", "den")}' for x in subpops.keys()]
-#             qry = f"""
-# select
-#     year,
-#     {geoid_trg},
-#     county,
-#     {ut.select(feat_geo)},
-#     ntile(3) over (order by {feat_den[0].split(' as ')[0]} asc) as urbanization,
-#     {ut.select(feat_den)},
-#     {ut.select(feat_acs)},
-# from (
-#     {ut.subquery(qry)})"""
             self.qry_to_tbl(qry, tbl_trg, True)
         return tbl_trg
 
@@ -316,18 +283,13 @@ from (
         attr = 'geo'
         geoid = self.get_decade(geoid)
         tbl = f'{attr}.{self.state.abbr}_{geoid}'
-
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
-            assert 1==2
             path, level, year, decade = self.parse(tbl)
             block = f'block{decade}'
             sel_pop = {x:f'sum({x}) as {x}' for x in subpops.keys()}
             sel_den = {x.replace("pop", "den"):f'{x} / greatest(1, aland) * 1000000 as {x.replace("pop", "den")}' for x in subpops.keys()}
             g = lambda x: f'join (select {geoid}, {x}, sum(pop_tot_all) as p from {self.get_intersection()} group by 1, 2 qualify row_number() over (partition by {geoid} order by p desc) = 1) using ({geoid})'
             sel_plan = {x:g(x) for x in self.bq.get_cols(self.get_plan())[1:]}
-    
-    
-
             qry = f"""
 select
     {geoid}, county, dist_to_border, aland, awater, atot,
@@ -355,34 +317,8 @@ from (
         group by {geoid}))
 {g('county')}
 """+ut.join(sel_plan.values(), '\n')
-    
-#             qry = f"""
-# --select {geoid}, county)},* except ({geoid}, county, geometry), geometry,
-# select {geoid}, county, {ut.select(sel_geo)}, {ut.select(sel_den)}, {ut.select(sel_pop)}, {ut.select(sel_plan)}, geometry,
-# from (
-#     select
-#         *,
-#         4*{np.pi}*atot / greatest(1, perim * perim) as polsby_popper,
-#     from (
-#         select 
-#             *,
-#             st_distance(geometry, (select st_boundary(us_outline_geom) from bigquery-public-data.geo_us_boundaries.national_outline)) as dist_to_border,
-#             st_area(geometry) as atot,
-#             st_perimeter(geometry) as perim,
-#         from (
-#             select
-#                 {geoid},
-#                 {ut.select(sel_den, 4)},
-#                 {ut.select(sel_pop, 4)},
-#                 sum(A.aland) as aland,
-#                 sum(A.awater) as awater,
-#                 st_union_agg(B.geometry) as geometry,
-#             from {self.get_intersection()} as A
-#             join {self.get_shape()[block]} as B using ({block})
-#             group by {geoid})))
-# {f('county')}
-# {join_plan}"""
             self.qry_to_tbl(qry, tbl, True)
+            print(self.tbls)
         return tbl
 
 
