@@ -306,11 +306,12 @@ from (
 #             join_plan = ut.join([f(x) for x in self.bq.get_cols(self.get_plan())[1:]], '\n')
 #             join_plan = ut.join([f(x) for x in sel_plan], '\n')
             sel_plan = {x:f(x) for x in self.bq.get_cols(self.get_plan())[1:]}
+    
+    
 
             qry = f"""
 select
-    {geoid}, county,
-    dist_to_border, aland, awater, atot, perim, 4 * {np.pi} * atot / greatest(1, perim * perim) as polsby_popper,
+    {geoid}, county, dist_to_border, aland, awater, atot, perim, 4 * {np.pi} * atot / greatest(1, perim * perim) as polsby_popper,
     {ut.join(sel_den.keys())},
     {ut.join(sel_pop.keys())},
     {ut.join(sel_plan.keys())},
@@ -321,11 +322,11 @@ from (
         st_distance(geometry, (select st_boundary(us_outline_geom) from bigquery-public-data.geo_us_boundaries.national_outline)) as dist_to_border,
         st_area(geometry) as atot,
         st_perimeter(geometry) as perim,
-        {ut.select(sel_den.values(), 3)},
+        {ut.select(sel_den.values(), 2)},
     from (
         select
             {geoid},
-            {ut.select(sel_pop.values(), 4)},
+            {ut.select(sel_pop.values(), 3)},
             sum(A.aland) as aland,
             sum(A.awater) as awater,
             st_union_agg(B.geometry) as geometry,
