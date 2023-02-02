@@ -274,7 +274,7 @@ from (
             join {self.get_geo(geoid_src)} as S using ({geoid_src})
             join {self.get_geo(geoid_trg)} as T using ({geoid_trg})
             group by 1,2,3)))"""
-            self.qry_to_tbl(qry, tbl_trg, True)
+            self.qry_to_tbl(qry, tbl_trg)
         return tbl_trg
 
 
@@ -316,7 +316,7 @@ from (
         group by {geoid}))
 {g('county')}
 """+ut.join(sel_plan.values(), '\n')
-            self.qry_to_tbl(qry, tbl, True)
+            self.qry_to_tbl(qry, tbl)
         return tbl
 
 
@@ -351,7 +351,7 @@ join (
     on st_intersects(A.geometry, B.geometry)
     qualify areaint = max(areaint) over (partition by {geoid})
 ) using ({geoid})"""
-            self.qry_to_tbl(qry, tbl, True)
+            self.qry_to_tbl(qry, tbl)
         return tbl
 
 
@@ -396,8 +396,6 @@ join (
                 df = ut.prep(pd.read_csv(txt, sep='|')).rename(columns=repl)
                 for year in [2010, 2020]:
                     geoid = self.get_geoid(df, level='block', year=year)
-#                 for x in ['aland', 'awater']:
-#                     df[x]  = df[x] / 1000 / 1000
                 self.df_to_tbl(df, tbl, cols=['block2010', 'block2020', 'aland', 'awater'])
         return tbl
 
