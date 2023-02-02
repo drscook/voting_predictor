@@ -403,9 +403,7 @@ select
     {ut.select(sel_den)},
     {ut.select(sel_pop)},
     plan.* except({geoid}),
-from (
-    select *, aland / greatest(1, sum(aland) over (partition by {geoid})) as aprop,
-    from crosswalk.{self.state.abbr}_{geoid})
+from (select *, aland / greatest(1, sum(aland) over (partition by {geoid})) as aprop from crosswalk.{self.state.abbr}_{geoid})
 join census.{self.state.abbr}_{geoid} using ({geoid})
 join plan.{self.state.abbr}_{geoid} as plan using ({geoid})"""
             for vtd in sel_vtd:
