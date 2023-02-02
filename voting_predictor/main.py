@@ -181,8 +181,8 @@ left join (
     pivot(sum(votes) for party in ("D", "R")
 ) as B using ({geoid})"""
                 L.append(qry)
-            qry = ut.join(L, 'union all\n')
-            self.qry_to_tbl(qry, tbl)
+            qry = ut.join(L, '\nunion all')
+            self.qry_to_tbl(qry, tbl, True)
         return tbl
 
 
