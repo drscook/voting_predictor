@@ -159,7 +159,6 @@ from (
             for campaign, candidates in campaigns:
                 office, year = campaign.split('_')
                 year = int(year)
-#                 year = min(int(year), datetime.date.today().year-2)
                 qry = f"""
 select
     *,
@@ -318,7 +317,6 @@ from (
 {g('county')}
 """+ut.join(sel_plan.values(), '\n')
             self.qry_to_tbl(qry, tbl, True)
-            print(self.tbls)
         return tbl
 
 
