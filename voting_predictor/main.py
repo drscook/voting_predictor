@@ -172,7 +172,7 @@ select
     ifnull(D,0) / greatest(1, ifnull(D,0) + ifnull(R,0)) as pref_dem,
     ifnull(R,0) / greatest(1, ifnull(D,0) + ifnull(R,0)) as pref_rep,
     ntile(3) over (order by den_tot_all asc) as urbanization,
-    A.* except ({geoid}, urbanization),
+    A.* except ({geoid}),
 from {self.get_acs(level='tract', year=min(year, datetime.date.today().year-2), geoid_trg=geoid)} as A
 left join (
     select {geoid}, party, votes,
@@ -180,32 +180,6 @@ left join (
     where office = "{office}" and year = {year})
     pivot(sum(votes) for party in ("D", "R")
 ) as B using ({geoid})"""
-
-                
-                
-#                 qry = f"""
-# select
-#     *,
-#     vote_tot / greatest(1, pop_vap_all) as vote_rate,
-#     vote_dem / greatest(1, vote_tot) as pref_dem,
-#     vote_rep / greatest(1, vote_tot) as pref_rep,
-# from (
-#     select 
-#         "{campaign}" as campaign,
-#         "{candidates}" as candidates,
-#         {year%4==2} as midterm,
-#         {'President' in campaign or 'USSen' in campaign or 'USRep' in campaign} as federal,
-#         * except (D, R),
-#         coalesce(D, 0) as vote_dem,
-#         coalesce(R, 0) as vote_rep,
-#         coalesce(D, 0) + coalesce(R, 0) as vote_tot,
-#     from {self.get_acs(level='tract', year=min(year, datetime.date.today().year-2), geoid_trg=geoid)} as A
-#     left join (
-#         select {geoid}, party, votes,
-#         from {self.get_election()}
-#         where office = "{office}" and year = {year})
-#         pivot(sum(votes) for party in ("D", "R")
-#     ) as B using ({geoid}))"""
                 L.append(qry)
             qry = ut.join(L, '\nunion all\n')
             self.qry_to_tbl(qry, tbl, True)
@@ -276,31 +250,53 @@ left join (
             sel_all = {x:f'{x.replace("all", "hisp")} + {x.replace("all", "other")} + {x.replace("all", "white")} as {x}' for x in feat_acs if "all" in x}
             sel_den = {x.replace("pop", "den"):f'{x} / greatest(1, aland) * 1000000 as {x.replace("pop", "den")}' for x in subpops.keys()}
             sel_geo = {x:f'min(T.{x}) as {x}' for x in ['dist_to_border', 'aland', 'awater', 'atot', 'perim', 'polsby_popper']}
+            
             qry = f"""
 select
-    year, {geoid_trg}, county, {ut.join(sel_geo.keys())},
-    ntile(3) over (order by den_tot_all asc) as urbanization,
-    {ut.join(sel_den.keys())},
+    year, {geoid_trg}, county,
+    {ut.join(sel_geo.keys())},
+    {ut.select(sel_den.values())},
     {ut.join(feat_acs)},
 from (
     select
         *,
-        {ut.select(sel_den.values(), 2)},
+        {ut.select(sel_all.values(), 2)},
     from (
         select
-            *,
-            {ut.select(sel_all.values(), 3)},
-        from (
-            select
-                A.year, T.{geoid_trg}, T.county,
-                {ut.select(sel_geo.values(), 4)},
-                {ut.select(sel_grp.values(), 4)},
-            from {tbl_src} as A
-            join {self.get_intersection()} as I using ({geoid_src})
-            join {self.get_geo(geoid_src)} as S using ({geoid_src})
-            join {self.get_geo(geoid_trg)} as T using ({geoid_trg})
-            group by 1,2,3)))"""
-            self.qry_to_tbl(qry, tbl_trg)
+            A.year, T.{geoid_trg}, T.county,
+            {ut.select(sel_geo.values(), 3)},
+            {ut.select(sel_grp.values(), 3)},
+        from {tbl_src} as A
+        join {self.get_intersection()} as I using ({geoid_src})
+        join {self.get_geo(geoid_src)} as S using ({geoid_src})
+        join {self.get_geo(geoid_trg)} as T using ({geoid_trg})
+        group by 1,2,3))"""
+
+#             qry = f"""
+# select
+#     year, {geoid_trg}, county,
+#     {ut.join(sel_geo.keys())},
+#     {ut.join(sel_den.keys())},
+#     {ut.join(feat_acs)},
+# from (
+#     select
+#         *,
+#         {ut.select(sel_den.values(), 2)},
+#     from (
+#         select
+#             *,
+#             {ut.select(sel_all.values(), 3)},
+#         from (
+#             select
+#                 A.year, T.{geoid_trg}, T.county,
+#                 {ut.select(sel_geo.values(), 4)},
+#                 {ut.select(sel_grp.values(), 4)},
+#             from {tbl_src} as A
+#             join {self.get_intersection()} as I using ({geoid_src})
+#             join {self.get_geo(geoid_src)} as S using ({geoid_src})
+#             join {self.get_geo(geoid_trg)} as T using ({geoid_trg})
+#             group by 1,2,3)))"""
+            self.qry_to_tbl(qry, tbl_trg, True)
         return tbl_trg
 
 
