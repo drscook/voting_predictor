@@ -294,7 +294,7 @@ from (
             path, level, year, decade = self.parse(tbl)
             block = f'block{decade}'
             sel_pop = [f'sum({x}) as {x}' for x in subpops.keys()]
-            sel_den = [f'sum({x}) / greatest(1, sum(aland)) * 1000000 as {x.replace("pop", "den")}' for x in subpops.keys()]
+            sel_den = [f'sum({x}) / greatest(1, sum(A.aland)) * 1000000 as {x.replace("pop", "den")}' for x in subpops.keys()]
             f = lambda x: f'join (select * except (p) from (select {geoid}, {x}, sum(pop_tot_all) as p from {self.get_intersection()} group by 1, 2 qualify row_number() over (partition by {geoid} order by p desc) = 1)) using ({geoid})'
 #             join_plan = ut.join([f(x) for x in ['county', *self.bq.get_cols(self.get_plan())[1:]]], '\n')
             join_plan = ut.join([f(x) for x in self.bq.get_cols(self.get_plan())[1:]], '\n')
