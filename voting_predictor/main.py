@@ -160,31 +160,54 @@ from (
                 office, year = campaign.split('_')
                 year = int(year)
                 qry = f"""
-select
-    *,
-    vote_tot / greatest(1, pop_vap_all) as vote_rate,
-    vote_dem / greatest(1, vote_tot) as pref_dem,
-    vote_rep / greatest(1, vote_tot) as pref_rep,
-from (
-    select 
-        "{campaign}" as campaign,
-        "{candidates}" as candidates,
-        {year%4==2} as midterm,
-        {'President' in campaign or 'USSen' in campaign or 'USRep' in campaign} as federal,
-        * except (D, R),
-        coalesce(D, 0) as vote_dem,
-        coalesce(R, 0) as vote_rep,
-        coalesce(D, 0) + coalesce(R, 0) as vote_tot,
-    from {self.get_acs(level='tract', year=min(year, datetime.date.today().year-2), geoid_trg=geoid)} as A
-    left join (
-        select {geoid}, midterm, federal, party, votes,
-        from {self.get_election()}
-        where office = "{office}" and year = {year})
-        pivot(sum(votes) for party in ("D", "R")
-    ) as B using ({geoid}))"""
-                L.append(qry)   
-            qry = ut.join(L, '\nunion all\n')
-            self.qry_to_tbl(qry, tbl)
+select 
+    "{campaign}" as campaign,
+    "{candidates}" as candidates,
+    {year%4==2} as midterm,
+    {'President' in campaign or 'USSen' in campaign or 'USRep' in campaign} as federal,
+    ifnull(D, 0) as vote_dem,
+    ifnull(R, 0) as vote_rep,
+    ifnull(D, 0) + ifnull(R, 0) as vote_tot,
+    (ifnull(D, 0) + ifnull(R, 0)) / greatest(1, pop_vap_all) as vote_rate,
+    ifnull(D, 0) / greatest(1, ifnull(D, 0) + ifnull(R, 0)) as pref_dem,
+    ifnull(R, 0) / greatest(1, ifnull(D, 0) + ifnull(R, 0)) as pref_rep,
+    A.* except ({geoid}),
+from {self.get_acs(level='tract', year=min(year, datetime.date.today().year-2), geoid_trg=geoid)} as A
+left join (
+    select {geoid}, party, votes,
+    from {self.get_election()}
+    where office = "{office}" and year = {year})
+    pivot(sum(votes) for party in ("D", "R")
+) as B using ({geoid})"""
+
+                
+                
+#                 qry = f"""
+# select
+#     *,
+#     vote_tot / greatest(1, pop_vap_all) as vote_rate,
+#     vote_dem / greatest(1, vote_tot) as pref_dem,
+#     vote_rep / greatest(1, vote_tot) as pref_rep,
+# from (
+#     select 
+#         "{campaign}" as campaign,
+#         "{candidates}" as candidates,
+#         {year%4==2} as midterm,
+#         {'President' in campaign or 'USSen' in campaign or 'USRep' in campaign} as federal,
+#         * except (D, R),
+#         coalesce(D, 0) as vote_dem,
+#         coalesce(R, 0) as vote_rep,
+#         coalesce(D, 0) + coalesce(R, 0) as vote_tot,
+#     from {self.get_acs(level='tract', year=min(year, datetime.date.today().year-2), geoid_trg=geoid)} as A
+#     left join (
+#         select {geoid}, party, votes,
+#         from {self.get_election()}
+#         where office = "{office}" and year = {year})
+#         pivot(sum(votes) for party in ("D", "R")
+#     ) as B using ({geoid}))"""
+#                 L.append(qry)   
+#             qry = ut.join(L, '\nunion all\n')
+            self.qry_to_tbl(qry, tbl, True)
         return tbl
 
 
