@@ -256,13 +256,11 @@ from (
             
             qry = f"""
 select
-    year,
-    {geoid_trg},
-    county,
-    {ut.select(sel_geo.keys())},
+    year, {geoid_trg}, county,
+    {ut.join(sel_geo.keys())},
     ntile(3) over (order by den_tot_all asc) as urbanization,
-    {ut.select(sel_den.keys())},
-    {ut.select(feat_acs)},
+    {ut.join(sel_den.keys())},
+    {ut.join(feat_acs)},
 from (
     select
         *,
@@ -273,9 +271,7 @@ from (
             {ut.select(sel_all.values(), 3)},
         from (
             select
-                A.year,
-                T.{geoid_trg},
-                T.county,
+                A.year, T.{geoid_trg}, T.county,
                 {ut.select(sel_geo.values(), 4)},
                 {ut.select(sel_grp.values(), 4)},
             from {tbl_src} as A
