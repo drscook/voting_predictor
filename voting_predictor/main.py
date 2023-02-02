@@ -246,14 +246,11 @@ from (
                             self.compute_other(df, name)
                     self.df_to_tbl(df, tbl_src, cols=['year', geoid_src, *features.keys()])    
             feat_acs = self.bq.get_cols(tbl_src)[2:]
-#             feat_geo = ['dist_to_border', 'aland', 'awater', 'atot', 'perim', 'polsby_popper']
-            sel_geo = {x:f'min(T.{x}) as {x}' for x in ['dist_to_border', 'aland', 'awater', 'atot', 'perim', 'polsby_popper']}
-#             sel_geo = [f'min(T.{x}) as {x}' for x in feat_geo]            
             g = lambda x: 'pop'+x[x.find('_'):]
             sel_grp = {x:f'sum(A.{x} * I.{g(x)} / greatest(1, S.{g(x)})) as {x}' for x in feat_acs if not "all" in x}
             sel_all = {x:f'{x.replace("all", "hisp")} + {x.replace("all", "other")} + {x.replace("all", "white")} as {x}' for x in feat_acs if "all" in x}
             sel_den = {x.replace("pop", "den"):f'{x} / greatest(1, aland) * 1000000 as {x.replace("pop", "den")}' for x in subpops.keys()}
-            
+            sel_geo = {x:f'min(T.{x}) as {x}' for x in ['dist_to_border', 'aland', 'awater', 'atot', 'perim', 'polsby_popper']}
             qry = f"""
 select
     year, {geoid_trg}, county, {ut.join(sel_geo.keys())},
@@ -325,7 +322,6 @@ from (
             block = f'block{decade}'
             sel_pop = {x:f'sum({x}) as {x}' for x in subpops.keys()}
             sel_den = {x.replace("pop", "den"):f'{x} / greatest(1, aland) * 1000000 as {x.replace("pop", "den")}' for x in subpops.keys()}
-#             sel_geo = ['dist_to_border', 'aland', 'awater', 'atot', 'perim']
             g = lambda x: f'join (select {geoid}, {x}, sum(pop_tot_all) as p from {self.get_intersection()} group by 1, 2 qualify row_number() over (partition by {geoid} order by p desc) = 1) using ({geoid})'
             sel_plan = {x:g(x) for x in self.bq.get_cols(self.get_plan())[1:]}
     
@@ -355,7 +351,7 @@ from (
         from {self.get_intersection()} as A
         join {self.get_shape()[block]} as B using ({block})
         group by {geoid}))
-{f('county')}
+{g('county')}
 """+ut.join(sel_plan.values(), '\n')
     
 #             qry = f"""
