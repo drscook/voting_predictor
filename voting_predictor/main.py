@@ -347,6 +347,7 @@ from (
         geoid = 'block2020'
         tbl = f'geo.{self.state.abbr}_{attr}'
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
+            block = f'block2020'
             sel_id  = [f'div(block{year}, {10**(15-self.levels[level])}) as {level}{year}' for level in self.levels.keys() for year in [2020, 2010]][::-1]
             sel_pop = [f'aprop * {x} as {x}' for x in subpops.keys()]
             sel_den = [f'aprop * {x} / greatest(1, aland) * 1000000 as {x.replace("pop", "den")}' for x in subpops.keys()]
@@ -361,15 +362,15 @@ select
     {ut.select(sel_den)},
     {ut.select(sel_pop)},
     plan.* except({geoid}),
-from (select *, aland / greatest(1, sum(aland) over (partition by {geoid})) as aprop from crosswalk.{self.state.abbr}_{geoid})
-join census.{self.state.abbr}_{geoid} using ({geoid})
-join plan.{self.state.abbr}_{geoid} as plan using ({geoid})"""
+from (select *, aland / greatest(1, sum(aland) over (partition by {geoid})) as aprop from {self.get_crosswalk()}) as crosswalk
+join {self.get_census()} as census using ({geoid})
+join {self.get_plan()} as plan using ({geoid})"""
             for vtd in sel_vtd:
                 qry += f"""
 join (
     select {geoid}, {vtd}, st_area(st_intersection(A.geometry, B.geometry)) as areaint,
-    from shape.{self.state.abbr}_{geoid} as A
-    join shape.{self.state.abbr}_{vtd} as B
+    from {self.get_shape()[block]} as A
+    join {self.get_shape()[vtd]} as B
     on st_intersects(A.geometry, B.geometry)
     qualify areaint = max(areaint) over (partition by {geoid})
 ) using ({geoid})"""
