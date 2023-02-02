@@ -333,7 +333,7 @@ from (
         join {self.get_shape()[block]} as B using ({block})
         group by {geoid}))
 {f('county')}
-"""+ut.join(sel.plan.values(), '\n')
+"""+ut.join(sel_plan.values(), '\n')
     
 #             qry = f"""
 # --select {geoid}, county)},* except ({geoid}, county, geometry), geometry,
