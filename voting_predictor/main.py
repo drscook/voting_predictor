@@ -391,7 +391,7 @@ join (
                 download(zip_file, url)
                 txt = zip_file.with_name(f'{zip_file.stem}_{self.state.abbr}.txt'.lower())
                 repl = {'blk_2010': 'block_2010', 'blk_2020': 'block_2020', 'arealand_int': 'aland', 'areawater_int':'awater'}
-                df = ut.prep(pd.read_csv(txt, sep='|')).rename(columns=repl).query(f'(state_2010=={self.state.fips}) & (state_2020=={self.state.fips})')
+                df = ut.prep(pd.read_csv(txt, sep='|')).rename(columns=repl).query(f'state_2010=={self.state.fips} and state_2020=={self.state.fips}')
 #                 mask = (df['state_2010']!=self.state.fips) | (df['state_2020']!=self.state.fips)
                 
 #                 print()
