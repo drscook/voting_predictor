@@ -165,12 +165,12 @@ select
     "{candidates}" as candidates,
     {year%4==2} as midterm,
     {'President' in campaign or 'USSen' in campaign or 'USRep' in campaign} as federal,
-    ifnull(D, 0) as vote_dem,
-    ifnull(R, 0) as vote_rep,
-    ifnull(D, 0) + ifnull(R, 0) as vote_tot,
-    (ifnull(D, 0) + ifnull(R, 0)) / greatest(1, pop_vap_all) as vote_rate,
-    ifnull(D, 0) / greatest(1, ifnull(D, 0) + ifnull(R, 0)) as pref_dem,
-    ifnull(R, 0) / greatest(1, ifnull(D, 0) + ifnull(R, 0)) as pref_rep,
+    ifnull(D,0) as vote_dem,
+    ifnull(R,0) as vote_rep,
+    ifnull(D,0) + ifnull(R,0) as vote_tot,
+    (ifnull(D,0) + ifnull(R,0)) / greatest(1, pop_vap_all) as vote_rate,
+    ifnull(D,0) / greatest(1, ifnull(D,0) + ifnull(R,0)) as pref_dem,
+    ifnull(R,0) / greatest(1, ifnull(D,0) + ifnull(R,0)) as pref_rep,
     A.* except ({geoid}),
 from {self.get_acs(level='tract', year=min(year, datetime.date.today().year-2), geoid_trg=geoid)} as A
 left join (
