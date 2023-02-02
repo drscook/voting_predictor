@@ -289,42 +289,71 @@ from (
         attr = 'geo'
         geoid = self.get_decade(geoid)
         tbl = f'{attr}.{self.state.abbr}_{geoid}'
+
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
+            path, level, year, decade = self.parse(tbl)
+            block = f'block{decade}'
             sel_pop = [f'sum({x}) as {x}' for x in subpops.keys()]
             sel_den = [f'sum({x}) / greatest(1, sum(aland)) * 1000000 as {x.replace("pop", "den")}' for x in subpops.keys()]
-            sel_geo = [f'sum({x}) as {x}' for x in ['aland', 'awater', 'atot']]
+            f = lambda x: f'join (select * except (p) from (select {geoid}, {x}, sum(pop_tot_all) as p from {self.get_intersection()} group by 1, 2 qualify row_number() over (partition by {geoid} order by p desc) = 1)) using ({geoid})'
+#             join_plan = ut.join([f(x) for x in ['county', *self.bq.get_cols(self.get_plan())[1:]]], '\n')
+            join_plan = ut.join([f(x) for x in self.bq.get_cols(self.get_plan())[1:]], '\n')
+
             qry = f"""
-select
-    {geoid},
-    {ut.select(sel_den)},
-    {ut.select(sel_pop)},
-    min(dist_to_border) as dist_to_border,
-    {ut.select(sel_geo)},
-    st_union_agg(geometry) as geometry,
-from {self.get_intersection()}
-group by {geoid}"""
-            f = lambda x: f'join (select {geoid}, {x}, sum(pop_tot_all) as p from {self.get_intersection()} group by {geoid}, {x} qualify row_number() over (partition by {geoid} order by p desc) = 1) as {x}_tbl using ({geoid})'
-            sel_plan  = ['county', *self.bq.get_cols(self.get_plan())[1:]]
-            join_plan = ut.join([f(x) for x in sel_plan], '\n')
-            qry = f"""
-select
-    {geoid},
-    {ut.join(sel_plan)},
-    A.* except ({geoid}),
-    st_perimeter(geometry) as perim,
+select {geoid}, county, * except ({geoid}, county, geometry), geometry,
 from (
-    {ut.subquery(qry)}
-) as A
+    select *, 4*{np.pi}*atot / greatest(1, perim * perim) as polsby_popper,
+    from (
+        select *, st_area(geometry) as atot, st_perimeter(geometry) as perim,
+        from (
+            select
+                {geoid},
+                {ut.select(sel_pop, 4)},
+                {ut.select(sel_den, 4)},
+                sum(A.aland) as aland,
+                sum(A.awater) as awater,
+                st_union_agg(B.geometry) as geometry,
+            from {self.get_intersection()} as A
+            join {self.get_shape()[block]} as B using ({block})
+            group by {geoid})))
+{f('county')}
 {join_plan}"""
-            qry = f"""
-select
-    * except (geometry),
-    case when perim < 0.1 then 0 else 4 * {np.pi} * atot / (perim * perim) end as polsby_popper,
-    st_centroid(geometry) as point,
-    geometry,
-from (
-    {ut.subquery(qry)})"""
-            self.qry_to_tbl(qry, tbl)
+
+            
+            
+            
+#             qry = f"""
+# select
+#     {geoid},
+#     {ut.select(sel_den)},
+#     {ut.select(sel_pop)},
+#     min(dist_to_border) as dist_to_border,
+#     {ut.select(sel_geo)},
+#     st_union_agg(geometry) as geometry,
+# from {self.get_intersection()}
+# group by {geoid}"""
+#             f = lambda x: f'join (select {geoid}, {x}, sum(pop_tot_all) as p from {self.get_intersection()} group by {geoid}, {x} qualify row_number() over (partition by {geoid} order by p desc) = 1) as {x}_tbl using ({geoid})'
+#             sel_plan  = ['county', *self.bq.get_cols(self.get_plan())[1:]]
+#             join_plan = ut.join([f(x) for x in sel_plan], '\n')
+#             qry = f"""
+# select
+#     {geoid},
+#     {ut.join(sel_plan)},
+#     A.* except ({geoid}),
+#     st_perimeter(geometry) as perim,
+# from (
+#     {ut.subquery(qry)}
+# ) as A
+# {join_plan}"""
+#             qry = f"""
+# select
+#     * except (geometry),
+#     case when perim < 0.1 then 0 else 4 * {np.pi} * atot / (perim * perim) end as polsby_popper,
+#     st_centroid(geometry) as point,
+#     geometry,
+# from (
+#     {ut.subquery(qry)})"""
+            self.qry_to_tbl(qry, tbl, True)
         return tbl
 
 
