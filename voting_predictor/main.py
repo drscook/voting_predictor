@@ -246,13 +246,10 @@ from (
                             self.compute_other(df, name)
                     self.df_to_tbl(df, tbl_src, cols=['year', geoid_src, *features.keys()])    
             feat_acs = self.bq.get_cols(tbl_src)[2:]
-            
-            sel_geo = {x:f'min(T.{x}) as {x}' for x in ['dist_to_border', 'aland', 'awater', 'atot', 'perim', 'polsby_popper']}
-            
 #             feat_geo = ['dist_to_border', 'aland', 'awater', 'atot', 'perim', 'polsby_popper']
-            f = lambda x: 'pop'+x[x.find('_'):]
+            sel_geo = {x:f'min(T.{x}) as {x}' for x in ['dist_to_border', 'aland', 'awater', 'atot', 'perim', 'polsby_popper']}
+#             sel_geo = [f'min(T.{x}) as {x}' for x in feat_geo]            f = lambda x: 'pop'+x[x.find('_'):]
             sel_grp = {x:f'sum(A.{x} * I.{f(x)} / greatest(1, S.{f(x)})) as {x}' for x in feat_acs if not "all" in x}
-#             sel_geo = [f'min(T.{x}) as {x}' for x in feat_geo]
             sel_all = {x:f'{x.replace("all", "hisp")} + {x.replace("all", "other")} + {x.replace("all", "white")} as {x}' for x in feat_acs if "all" in x}
             sel_den = {x:f'{x} / greatest(1, aland) * 1000000 as {x.replace("pop", "den")}' for x in subpops.keys()}
             
@@ -318,7 +315,7 @@ from (
 #     {ut.select(feat_acs)},
 # from (
 #     {ut.subquery(qry)})"""
-            self.qry_to_tbl(qry, tbl_trg)
+            self.qry_to_tbl(qry, tbl_trg, True)
         return tbl_trg
 
 
