@@ -330,67 +330,99 @@ from (
 
     def get_intersection(self):
         attr = 'intersection'
+        geoid = 'block2020'
         tbl = f'geo.{self.state.abbr}_{attr}'
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
-            qry = f"""
-select 
-    A.*,
-    A.aland / greatest(1, sum(A.aland) over (partition by A.block2020)) as aprop2020,
-    st_intersection(B.geometry, C.geometry) as geometry,
-from {self.get_crosswalk()} as A
-join {self.get_shape()['block2010']} as B on A.block2010 = B.block2010
-join {self.get_shape()['block2020']} as C on A.block2020 = C.block2020"""
-            qry = f"""
-select
-    B.vtd2020,
-    A.*,
-    st_area(st_intersection(A.geometry, B.geometry)) as areaint2020,
-from (
-    {ut.subquery(qry)}
-) as A
-join {self.get_shape()['vtd2020']} as B on st_intersects(A.geometry, B.geometry)
-qualify areaint2020 = max(areaint2020) over (partition by block2010, block2020)"""
-            qry = f"""
-select
-    B.vtd2022,
-    A.*,
-    st_area(st_intersection(A.geometry, B.geometry)) as areaint2022,
-from (
-    {ut.subquery(qry)}
-) as A
-join {self.get_shape()['vtd2022']} as B on st_intersects(A.geometry, B.geometry)
-qualify areaint2022 = max(areaint2022) over (partition by block2010, block2020)"""
-            sel_id  = [f'div(A.block{year}, {10**(15-self.levels[level])}) as {level}{year}' for level in self.levels.keys() for year in [2020, 2010]][::-1]
-            sel_pop = [f'A.aprop2020 * B.{p} as {p}' for p in subpops.keys()]
-            sel_den = [f'A.aprop2020 * B.{p} / greatest(1, aland) * 1000000 as {p.replace("pop", "den")}' for p in subpops.keys()]
+            sel_id  = [f'div(block{year}, {10**(15-self.levels[level])}) as {level}{year}' for level in self.levels.keys() for year in [2020, 2010]][::-1]
+            sel_pop = [f'aprop * {x} as {x}' for x in subpops.keys()]
+            sel_den = [f'aprop * {x} / greatest(1, aland) * 1000000 as {x.replace("pop", "den")}' for x in subpops.keys()]
+            sel_vtd = ['vtd2020', 'vtd2022']
             qry = f"""
 select
     {ut.select(sel_id)},
-    vtd2020,
-    vtd2022,
+    {ut.select(sel_vtd)},
     county,
-    C.* except (block2020),
-    {ut.select(sel_den)},
     {ut.select(sel_pop)},
-    st_distance(A.geometry, (select st_boundary(us_outline_geom) from bigquery-public-data.geo_us_boundaries.national_outline)) as dist_to_border,
+    {ut.select(sel_den)},
     aland,
     awater,
-    st_area(A.geometry) as atot,
-    st_perimeter(A.geometry) as perim,
-    geometry,
+    plan.* except({geoid}),
 from (
-    {ut.subquery(qry)}
-) as A
-join {self.get_census()} as B using(block2020)
-join {self.get_plan()} as C using(block2020)"""
-            qry = f"""
-select
-    * except (geometry),
-    case when perim < 0.1 then 0 else 4 * {np.pi} * atot / (perim * perim) end as polsby_popper,
-    st_centroid(geometry) as point,
-    geometry,
-from (
-    {ut.subquery(qry)})"""
+    select *, aland / greatest(1, sum(aland) over (partition by {geoid})) as aprop,
+    from crosswalk.{self.state.abbr}_{geoid})
+join census.{self.state.abbr}_{geoid} using ({geoid})
+join plan.{self.state.abbr}_{geoid} as plan using ({geoid})"""
+for vtd in sel_vtd:
+    qry += f"""
+join (
+    select {geoid}, {vtd}, st_area(st_intersection(A.geometry, B.geometry)) as areaint,
+    from shape.{self.state.abbr}_{geoid} as A
+    join shape.{self.state.abbr}_{vtd} as B
+    on st_intersects(A.geometry, B.geometry)
+    qualify areaint = max(areaint) over (partition by {geoid})
+) using ({geoid})"""
+            
+            
+            
+#             qry = f"""
+# select 
+#     A.*,
+#     A.aland / greatest(1, sum(A.aland) over (partition by A.block2020)) as aprop2020,
+#     st_intersection(B.geometry, C.geometry) as geometry,
+# from {self.get_crosswalk()} as A
+# join {self.get_shape()['block2010']} as B on A.block2010 = B.block2010
+# join {self.get_shape()['block2020']} as C on A.block2020 = C.block2020"""
+#             qry = f"""
+# select
+#     B.vtd2020,
+#     A.*,
+#     st_area(st_intersection(A.geometry, B.geometry)) as areaint2020,
+# from (
+#     {ut.subquery(qry)}
+# ) as A
+# join {self.get_shape()['vtd2020']} as B on st_intersects(A.geometry, B.geometry)
+# qualify areaint2020 = max(areaint2020) over (partition by block2010, block2020)"""
+#             qry = f"""
+# select
+#     B.vtd2022,
+#     A.*,
+#     st_area(st_intersection(A.geometry, B.geometry)) as areaint2022,
+# from (
+#     {ut.subquery(qry)}
+# ) as A
+# join {self.get_shape()['vtd2022']} as B on st_intersects(A.geometry, B.geometry)
+# qualify areaint2022 = max(areaint2022) over (partition by block2010, block2020)"""
+#             sel_id  = [f'div(A.block{year}, {10**(15-self.levels[level])}) as {level}{year}' for level in self.levels.keys() for year in [2020, 2010]][::-1]
+#             sel_pop = [f'A.aprop2020 * B.{p} as {p}' for p in subpops.keys()]
+#             sel_den = [f'A.aprop2020 * B.{p} / greatest(1, aland) * 1000000 as {p.replace("pop", "den")}' for p in subpops.keys()]
+#             qry = f"""
+# select
+#     {ut.select(sel_id)},
+#     vtd2020,
+#     vtd2022,
+#     county,
+#     C.* except (block2020),
+#     {ut.select(sel_den)},
+#     {ut.select(sel_pop)},
+#     st_distance(A.geometry, (select st_boundary(us_outline_geom) from bigquery-public-data.geo_us_boundaries.national_outline)) as dist_to_border,
+#     aland,
+#     awater,
+#     st_area(A.geometry) as atot,
+#     st_perimeter(A.geometry) as perim,
+#     geometry,
+# from (
+#     {ut.subquery(qry)}
+# ) as A
+# join {self.get_census()} as B using(block2020)
+# join {self.get_plan()} as C using(block2020)"""
+#             qry = f"""
+# select
+#     * except (geometry),
+#     case when perim < 0.1 then 0 else 4 * {np.pi} * atot / (perim * perim) end as polsby_popper,
+#     st_centroid(geometry) as point,
+#     geometry,
+# from (
+#     {ut.subquery(qry)})"""
             self.qry_to_tbl(qry, tbl)
         return tbl
 
