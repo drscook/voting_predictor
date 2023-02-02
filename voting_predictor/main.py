@@ -171,7 +171,8 @@ select
     (ifnull(D,0) + ifnull(R,0)) / greatest(1, pop_vap_all) as vote_rate,
     ifnull(D,0) / greatest(1, ifnull(D,0) + ifnull(R,0)) as pref_dem,
     ifnull(R,0) / greatest(1, ifnull(D,0) + ifnull(R,0)) as pref_rep,
-    A.* except ({geoid}),
+    ntile(3) over (order by den_tot_all asc) as urbanization,
+    A.* except ({geoid}, urbanization),
 from {self.get_acs(level='tract', year=min(year, datetime.date.today().year-2), geoid_trg=geoid)} as A
 left join (
     select {geoid}, party, votes,
