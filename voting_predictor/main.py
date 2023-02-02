@@ -169,6 +169,8 @@ from (
     select 
         "{campaign}" as campaign,
         "{candidates}" as candidates,
+        {year%4==2} as midterm,
+        {'President' in campaign or 'USSen' in campaign or 'USRep' in campaign} as federal,
         * except (D, R),
         coalesce(D, 0) as vote_dem,
         coalesce(R, 0) as vote_rep,
@@ -208,9 +210,9 @@ from (
                         if mask.any():
                             repl = {(' ', '.', ','): ''}
                             df['year'] = int(a[0])
-                            df['midterm'] = (df['year']%4)==2
+#                             df['midterm'] = (df['year']%4)==2
                             df['office'] = ut.replace(df['office'], repl)
-                            df['federal'] = df['office'].str.contains('President|USSen|USRep')
+#                             df['federal'] = df['office'].str.contains('President|USSen|USRep')
                             df['election'] = ut.join(a[1:-2], '_')
                             df['name'] = ut.replace(df['name'], repl)
                             df['incumbent'] = df['incumbent'] == 'Y'
