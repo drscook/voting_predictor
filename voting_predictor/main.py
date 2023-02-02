@@ -293,24 +293,33 @@ from (
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
             path, level, year, decade = self.parse(tbl)
             block = f'block{decade}'
-            sel_pop = [f'sum({x}) as {x}' for x in subpops.keys()]
-            sel_den = [f'sum({x}) / greatest(1, sum(A.aland)) * 1000000 as {x.replace("pop", "den")}' for x in subpops.keys()]
-            sel_plan = self.bq.get_cols(self.get_plan())[1:]
+            sel_pop = {x:f'sum({x}) as {x}' for x in subpops.keys()}
+            sel_den = {x.replace("pop", "den"):f'{x} / greatest(1, aland) * 1000000 as {x.replace("pop", "den")}' for x in subpops.keys()}
+            
+#             sel_pop = [f'sum({x}) as {x}' for x in subpops.keys()]
+#             sel_den = [f'sum({x}) / greatest(1, sum(A.aland)) * 1000000 as {x.replace("pop", "den")}' for x in subpops.keys()]
+#             sel_plan = self.bq.get_cols(self.get_plan())[1:]
             sel_geo = ['dist_to_border', 'aland', 'awater', 'atot', 'perim']
-            f = lambda x: f'join (select * except (p) from (select {geoid}, {x}, sum(pop_tot_all) as p from {self.get_intersection()} group by 1, 2 qualify row_number() over (partition by {geoid} order by p desc) = 1)) using ({geoid})'
+            f = lambda x: f'join (select {geoid}, {x}, sum(pop_tot_all) as p from {self.get_intersection()} group by 1, 2 qualify row_number() over (partition by {geoid} order by p desc) = 1) using ({geoid})'
+#             f = lambda x: f'join (select * except (p) from (select {geoid}, {x}, sum(pop_tot_all) as p from {self.get_intersection()} group by 1, 2 qualify row_number() over (partition by {geoid} order by p desc) = 1)) using ({geoid})'
 #             join_plan = ut.join([f(x) for x in ['county', *self.bq.get_cols(self.get_plan())[1:]]], '\n')
 #             join_plan = ut.join([f(x) for x in self.bq.get_cols(self.get_plan())[1:]], '\n')
-            join_plan = ut.join([f(x) for x in sel_plan], '\n')
+#             join_plan = ut.join([f(x) for x in sel_plan], '\n')
+            sel_plan = {x:f(x) for x in self.bq.get_cols(self.get_plan())[1:]}
 
             qry = f"""
 select
     {geoid},
     county,
-    {ut.select(sel_geo)},
-    4*{np.pi}*atot / greatest(1, perim * perim) as polsby_popper,
-    {ut.select(sel_den)},
-    {ut.select(sel_pop)},
-    {ut.select(sel_plan)},
+    dist_to_border,
+    aland,
+    awater,
+    atot,
+    perim,
+    4 * {np.pi} * atot / greatest(1, perim * perim) as polsby_popper,
+    {ut.select(sel_den.keys())},
+    {ut.select(sel_pop.keys())},
+    {ut.select(sel_plan.keys())},
     geometry,
 from (
     select 
@@ -318,11 +327,11 @@ from (
         st_distance(geometry, (select st_boundary(us_outline_geom) from bigquery-public-data.geo_us_boundaries.national_outline)) as dist_to_border,
         st_area(geometry) as atot,
         st_perimeter(geometry) as perim,
+        {ut.select(sel_den.values(), 3)},
     from (
         select
             {geoid},
-            {ut.select(sel_den, 4)},
-            {ut.select(sel_pop, 4)},
+            {ut.select(sel_pop.values(), 4)},
             sum(A.aland) as aland,
             sum(A.awater) as awater,
             st_union_agg(B.geometry) as geometry,
@@ -330,8 +339,7 @@ from (
         join {self.get_shape()[block]} as B using ({block})
         group by {geoid}))
 {f('county')}
-{join_plan}"""
-
+"""+ut.join(sel.plan.values(), '\n')
     
 #             qry = f"""
 # --select {geoid}, county)},* except ({geoid}, county, geometry), geometry,
