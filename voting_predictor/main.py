@@ -256,8 +256,7 @@ from (
             
             qry = f"""
 select
-    year, {geoid_trg}, county,
-    {ut.join(sel_geo.keys())},
+    year, {geoid_trg}, county, {ut.join(sel_geo.keys())},
     ntile(3) over (order by den_tot_all asc) as urbanization,
     {ut.join(sel_den.keys())},
     {ut.join(feat_acs)},
