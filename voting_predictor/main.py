@@ -309,17 +309,11 @@ from (
 
             qry = f"""
 select
-    {geoid},
-    county,
-    dist_to_border,
-    aland,
-    awater,
-    atot,
-    perim,
-    4 * {np.pi} * atot / greatest(1, perim * perim) as polsby_popper,
-    {ut.select(sel_den.keys())},
-    {ut.select(sel_pop.keys())},
-    {ut.select(sel_plan.keys())},
+    {geoid}, county,
+    dist_to_border, aland, awater, atot, perim, 4 * {np.pi} * atot / greatest(1, perim * perim) as polsby_popper,
+    {ut.join(sel_den.keys())},
+    {ut.join(sel_pop.keys())},
+    {ut.join(sel_plan.keys())},
     geometry,
 from (
     select 
