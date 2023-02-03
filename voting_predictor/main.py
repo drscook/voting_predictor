@@ -209,9 +209,7 @@ left join (
                         if mask.any():
                             repl = {(' ', '.', ','): ''}
                             df['year'] = int(a[0])
-#                             df['midterm'] = (df['year']%4)==2
                             df['office'] = ut.replace(df['office'], repl)
-#                             df['federal'] = df['office'].str.contains('President|USSen|USRep')
                             df['election'] = ut.join(a[1:-2], '_')
                             df['name'] = ut.replace(df['name'], repl)
                             df['incumbent'] = df['incumbent'] == 'Y'
@@ -249,8 +247,8 @@ left join (
             g = lambda x: 'pop'+x[x.find('_'):]
             sel_grp = {x:f'sum(A.{x} * I.{g(x)} / greatest(1, S.{g(x)})) as {x}' for x in feat_acs if not "all" in x}
             sel_all = {x:f'{x.replace("all", "hisp")} + {x.replace("all", "other")} + {x.replace("all", "white")} as {x}' for x in feat_acs if "all" in x}
-            sel_den = {x.replace("pop", "den"):f'{x} / greatest(1, aland) * 1000000 as {x.replace("pop", "den")}' for x in subpops.keys()}
-            sel_geo = {x:f'min(T.{x}) as {x}' for x in ['dist_to_border', 'aland', 'awater', 'atot', 'perim', 'polsby_popper']}
+            sel_den = {x.replace("pop", "den"):f'{x} / areatot * 1000000 as {x.replace("pop", "den")}' for x in subpops.keys()}
+            sel_geo = {x:f'min(T.{x}) as {x}' for x in ['dist_to_border', 'arealand', 'areawater', 'areatot', 'areacomputed', 'perimcomputed', 'polsby_popper']}
             qry = f"""
 select
     year, {geoid_trg}, county,
@@ -283,13 +281,13 @@ from (
             path, level, year, decade = self.parse(tbl)
             block = f'block{decade}'
             sel_pop = {x:f'sum({x}) as {x}' for x in subpops.keys()}
-            sel_den = {x.replace("pop", "den"):f'{x} / greatest(1, aland) * 1000000 as {x.replace("pop", "den")}' for x in subpops.keys()}
+            sel_den = {x.replace("pop", "den"):f'{x} / areatot * 1000000 as {x.replace("pop", "den")}' for x in subpops.keys()}
             g = lambda x: f'join (select {geoid}, {x}, sum(pop_tot_all) as p from {self.get_intersection()} group by 1, 2 qualify row_number() over (partition by {geoid} order by p desc) = 1) using ({geoid})'
             sel_plan = {x:g(x) for x in self.bq.get_cols(self.get_plan())[1:]}
             qry = f"""
 select
-    {geoid}, county, dist_to_border, aland, awater, atot,
-    perim, 4 * {np.pi} * atot / greatest(1, perim * perim) as polsby_popper,
+    {geoid}, county, dist_to_border, aland, awater, atot, areacomputed, perimcomputed,
+    4 * {np.pi} * areacomputed / (perimcomputed * perimcomputed) as polsby_popper,
     {ut.join(sel_den.keys())},
     {ut.join(sel_pop.keys())},
     {ut.join(sel_plan.keys())},
@@ -298,15 +296,16 @@ from (
     select 
         *,
         st_distance(geometry, (select st_boundary(us_outline_geom) from bigquery-public-data.geo_us_boundaries.national_outline)) as dist_to_border,
-        st_area(geometry) as atot,
-        st_perimeter(geometry) as perim,
+        st_area(geometry) as areacomputed,
+        st_perimeter(geometry) as perimcomputed,
         {ut.select(sel_den.values(), 2)},
     from (
         select
             {geoid},
             {ut.select(sel_pop.values(), 3)},
-            sum(A.aland) as aland,
-            sum(A.awater) as awater,
+            sum(A.arealand) as arealand,
+            sum(A.areawater) as areawater,
+            sum(A.areatot) as areatot,
             st_union_agg(B.geometry) as geometry,
         from {self.get_intersection()} as A
         join {self.get_shape()[block]} as B using ({block})
@@ -325,19 +324,20 @@ from (
             block = f'block2020'
             sel_id  = [f'div(block{year}, {10**(15-self.levels[level])}) as {level}{year}' for level in self.levels.keys() for year in [2020, 2010]][::-1]
             sel_pop = [f'aprop * {x} as {x}' for x in subpops.keys()]
-            sel_den = [f'aprop * {x} / greatest(1, aland) * 1000000 as {x.replace("pop", "den")}' for x in subpops.keys()]
+            sel_den = [f'aprop * {x} / areatot * 1000000 as {x.replace("pop", "den")}' for x in subpops.keys()]
             sel_vtd = ['vtd2020', 'vtd2022']
             qry = f"""
 select
     {ut.select(sel_id)},
     {ut.select(sel_vtd)},
     county,
-    aland,
-    awater,
+    arealand,
+    areawater,
+    areatot,
     {ut.select(sel_den)},
     {ut.select(sel_pop)},
     plan.* except({geoid}),
-from (select *, (aland+awater) / sum(aland+awater) over (partition by {geoid})) as aprop from {self.get_crosswalk()}) as crosswalk
+from (select *, atot / sum(atot) over (partition by {geoid})) as aprop from {self.get_crosswalk()}) as crosswalk
 join {self.get_census()} as census using ({geoid})
 join {self.get_plan()} as plan using ({geoid})"""
             for vtd in sel_vtd:
@@ -390,11 +390,12 @@ join (
                 url = f'https://www2.census.gov/geo/docs/maps-data/data/rel2020/t10t20/{zip_file.name}'
                 download(zip_file, url)
                 txt = zip_file.with_name(f'{zip_file.stem}_{self.state.abbr}.txt'.lower())
-                repl = {'blk_2010': 'block_2010', 'blk_2020': 'block_2020', 'arealand_int': 'aland', 'areawater_int':'awater'}
+                repl = {'blk_2010': 'block_2010', 'blk_2020': 'block_2020', 'arealand_int': 'arealand', 'areawater_int':'areawater'}
                 df = ut.prep(pd.read_csv(txt, sep='|')).rename(columns=repl)#.query(f'state_2010=={self.state.fips} and state_2020=={self.state.fips}')
+                df['areatot'] = df['arealand'] + df['areawater']
                 for year in [2010, 2020]:
                     geoid = self.get_geoid(df, level='block', year=year)
-                self.df_to_tbl(df, tbl, cols=['block2010', 'block2020', 'aland', 'awater'])
+                self.df_to_tbl(df, tbl, cols=['block2010', 'block2020', 'arealand', 'areawater', 'areatot'])
         return tbl
 
 
