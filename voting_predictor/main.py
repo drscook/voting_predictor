@@ -284,11 +284,13 @@ from (
             sel_den = {x.replace("pop", "den"):f'{x} / areatot * 1000000 as {x.replace("pop", "den")}' for x in subpops.keys()}
             g = lambda x: f'join (select {geoid}, {x}, sum(pop_tot_all) as p from {self.get_intersection()} group by 1, 2 qualify row_number() over (partition by {geoid} order by p desc) = 1) using ({geoid})'
             sel_plan = {x:g(x) for x in self.bq.get_cols(self.get_plan())[1:]}
+#                 {ut.join(sel_den.keys())},
+#             {ut.select(sel_den.values(), 2)},
             qry = f"""
 select
     {geoid}, county, dist_to_border, arealand, areawater, areatot, areacomputed, perimcomputed,
     4 * {np.pi} * areacomputed / (perimcomputed * perimcomputed) as polsby_popper,
-    {ut.join(sel_den.keys())},
+    {ut.select(sel_den.values())},
     {ut.join(sel_pop.keys())},
     {ut.join(sel_plan.keys())},
     geometry,
@@ -298,7 +300,6 @@ from (
         st_distance(geometry, (select st_boundary(us_outline_geom) from bigquery-public-data.geo_us_boundaries.national_outline)) as dist_to_border,
         st_area(geometry) as areacomputed,
         st_perimeter(geometry) as perimcomputed,
-        {ut.select(sel_den.values(), 2)},
     from (
         select
             {geoid},
@@ -349,7 +350,7 @@ join (
     on st_intersects(A.geometry, B.geometry)
     qualify areaint = max(areaint) over (partition by {geoid})
 ) using ({geoid})"""
-            self.qry_to_tbl(qry, tbl, True)
+            self.qry_to_tbl(qry, tbl)
         return tbl
 
 
