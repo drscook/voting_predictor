@@ -278,8 +278,6 @@ from (
         geoid = self.get_decade(geoid)
         tbl = f'{attr}.{self.state.abbr}_{geoid}'
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
-            print(tbl)
-            assert 1==2
             path, level, year, decade = self.parse(tbl)
             block = f'block{decade}'
             sel_pop = {x:f'sum({x}) as {x}' for x in subpops.keys()}
