@@ -368,7 +368,7 @@ join (
             'vtd2022':'https://data.capitol.texas.gov/dataset/4d8298d0-d176-4c19-b174-42837027b73e/resource/037e1de6-a862-49de-ae31-ae609e214972/download/vtds_22g.zip',
             'block2020':f'https://www2.census.gov/geo/tiger/TIGER2020/TABBLOCK20/tl_2020_{self.state.fips}_tabblock20.zip',
             'vtd2020':'https://data.capitol.texas.gov/dataset/4d8298d0-d176-4c19-b174-42837027b73e/resource/06157b97-40b8-43af-99d5-bd9b5850b15e/download/vtds20g_2020.zip',
-            'block2010':f'https://www2.census.gov/geo/tiger/TIGER2010/TABBLOCK/2010/tl_2010_{self.state.fips}_tabblock10.zip',
+#             'block2010':f'https://www2.census.gov/geo/tiger/TIGER2010/TABBLOCK/2010/tl_2010_{self.state.fips}_tabblock10.zip',
             }
         tbls = {geoid: f'{attr}.{self.state.abbr}_{geoid}' for geoid, url in urls.items()}
         for geoid, tbl in tbls.items():
