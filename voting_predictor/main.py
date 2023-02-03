@@ -245,7 +245,8 @@ left join (
                     self.df_to_tbl(df, tbl_src, cols=['year', geoid_src, *features.keys()])    
             feat_geo = ['county', 'dist_to_border', 'arealand', 'areawater', 'areatot', 'areacomputed', 'perimcomputed', 'polsby_popper']
             feat_acs = self.bq.get_cols(tbl_src)[2:]
-            sel_pop = {x:f'sum({x}) as {x}' for x in subpops.keys()}
+            sel_pop = [f'sum({x}) as {x}' for x in subpops.keys()]
+#             sel_pop = {x:f'sum({x}) as {x}' for x in subpops.keys()}
             g = lambda x: 'pop'+x[x.find('_'):]
 #             sel_grp = {x:f'sum(case when S.{g(x)} > 0 then A.{x} * I.{g(x)} / S.{g(x)} else A.{x} / S.ct end) as {x}' for x in feat_acs if not "all" in x}
 #             sel_all = {x:f'A.{x.replace("all", "hisp")} + A.{x.replace("all", "other")} + A.{x.replace("all", "white")} as {x}' for x in feat_acs if "all" in x}
