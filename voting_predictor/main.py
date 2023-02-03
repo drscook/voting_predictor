@@ -349,7 +349,7 @@ join (
     on st_intersects(A.geometry, B.geometry)
     qualify areaint = max(areaint) over (partition by {geoid})
 ) using ({geoid})"""
-            self.qry_to_tbl(qry, tbl)
+            self.qry_to_tbl(qry, tbl, True)
         return tbl
 
 
