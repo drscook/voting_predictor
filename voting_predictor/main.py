@@ -261,12 +261,12 @@ select
     {ut.join(feat_acs)},
 from (
     select
-        A.*,
+        *,
         {ut.select(sel_all.values(), 2)},
     from (
         select
-            A.year,
-            I.{geoid_trg},
+            year,
+            {geoid_trg},
             {ut.select(sel_grp.values(), 3)},
         from {tbl_src} as A
         join {self.get_intersection()} as I using ({geoid_src})
