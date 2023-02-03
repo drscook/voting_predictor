@@ -266,12 +266,19 @@ from (
         {ut.select(feat_geo)},
     from (
         select
-            year,
+            A.year,
             I.{geoid_trg}
             {ut.select(sel_grp.values(), 3)},
         from {tbl_src} as A
         join {self.get_intersection()} as I using ({geoid_src})
-        join {self.get_geo(geoid_src)} as S using ({geoid_src})
+        join (
+            select
+                {geoid_src},
+                count(*) as ct
+                {ut.select([f'sum({x}) as {x}' for x in subpops.keys()},
+            from {self.get_intersection()}
+            group by {geoid_src}
+        ) as S using ({geoid_src})
         group by 1, 2
     ) as A
     join {self.get_geo(geoid_trg)} as T using ({geoid_trg})"""
