@@ -314,7 +314,6 @@ from (
     from (
         select
             {geoid},
-            count(*) as ct,
             {ut.select(sel_pop.values(), 3)},
             sum(A.arealand) as arealand,
             sum(A.areawater) as areawater,
