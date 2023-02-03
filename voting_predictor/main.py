@@ -246,31 +246,35 @@ left join (
             feat_acs = self.bq.get_cols(tbl_src)[2:]
             g = lambda x: 'pop'+x[x.find('_'):]
             
-            sel_grp = {x:f'case when S.{g(x)} > 0 then sum(A.{x} * I.{g(x)} / S.{g(x)}) else sum(A.{x} / S.ct) end as {x}' for x in feat_acs if not "all" in x}
+            sel_grp = {x:f'sum(case when S.{g(x)} > 0 then A.{x} * I.{g(x)} / S.{g(x)} else A.{x} / S.ct end) as {x}' for x in feat_acs if not "all" in x}
 #             sel_grp = {x:f'sum(A.{x} * I.{g(x)} / greatest(1, S.{g(x)})) as {x}' for x in feat_acs if not "all" in x}
             sel_all = {x:f'{x.replace("all", "hisp")} + {x.replace("all", "other")} + {x.replace("all", "white")} as {x}' for x in feat_acs if "all" in x}
             sel_den = {x.replace("pop", "den"):f'{x} / areatot * 1000000 as {x.replace("pop", "den")}' for x in subpops.keys()}
-            sel_geo = {x:f'min(T.{x}) as {x}' for x in ['dist_to_border', 'arealand', 'areawater', 'areatot', 'areacomputed', 'perimcomputed', 'polsby_popper']}
+#             sel_geo = {x:f'min(T.{x}) as {x}' for x in ['dist_to_border', 'arealand', 'areawater', 'areatot', 'areacomputed', 'perimcomputed', 'polsby_popper']}
+            feat_geo = ['dist_to_border', 'arealand', 'areawater', 'areatot', 'areacomputed', 'perimcomputed', 'polsby_popper']
             qry = f"""
 select
     year, {geoid_trg}, county,
-    {ut.join(sel_geo.keys())},
+    {ut.join(feat_geo)},
     {ut.select(sel_den.values())},
     {ut.join(feat_acs)},
 from (
     select
-        *,
+        A.*
         {ut.select(sel_all.values(), 2)},
+        county,
+        {ut.select(feat_geo)},
     from (
         select
-            A.year, T.{geoid_trg}, T.county,
-            {ut.select(sel_geo.values(), 3)},
+            year,
+            I.{geoid_trg}
             {ut.select(sel_grp.values(), 3)},
         from {tbl_src} as A
         join {self.get_intersection()} as I using ({geoid_src})
         join {self.get_geo(geoid_src)} as S using ({geoid_src})
-        join {self.get_geo(geoid_trg)} as T using ({geoid_trg})
-        group by 1,2,3))"""
+        group by 1, 2
+    ) as A
+    join {self.get_geo(geoid_trg)} as T using ({geoid_trg})"""
             self.qry_to_tbl(qry, tbl_trg, True)
         return tbl_trg
 
