@@ -279,7 +279,7 @@ from (
         group by 1, 2
     ) as A
     join {self.get_geo(geoid_trg)} as T using ({geoid_trg}))"""
-            self.qry_to_tbl(qry, tbl_trg, True)
+            self.qry_to_tbl(qry, tbl_trg)
         return tbl_trg
 
 
