@@ -337,7 +337,7 @@ select
     {ut.select(sel_den)},
     {ut.select(sel_pop)},
     plan.* except({geoid}),
-from (select *, areatot / sum(atot) over (partition by {geoid}) as areaprop from {self.get_crosswalk()}) as crosswalk
+from (select *, areatot / sum(areatot) over (partition by {geoid}) as areaprop from {self.get_crosswalk()}) as crosswalk
 join {self.get_census()} as census using ({geoid})
 join {self.get_plan()} as plan using ({geoid})"""
             for vtd in sel_vtd:
