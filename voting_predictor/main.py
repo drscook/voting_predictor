@@ -312,7 +312,7 @@ from (
         group by {geoid}))
 {g('county')}
 """+ut.join(sel_plan.values(), '\n')
-            self.qry_to_tbl(qry, tbl)
+            self.qry_to_tbl(qry, tbl, True)
         return tbl
 
 
