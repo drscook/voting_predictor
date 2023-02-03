@@ -263,7 +263,7 @@ from (
     select
         A.*,
         {ut.select(sel_all.values(), 2)},
-        {ut.join(feat_geo)},
+        county, {ut.join(feat_geo)},
     from (
         select
             year,
