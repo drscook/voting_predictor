@@ -246,7 +246,7 @@ left join (
             feat_acs = self.bq.get_cols(tbl_src)[2:]
             g = lambda x: 'pop'+x[x.find('_'):]
             
-            sel_grp = {x:f'case when S.{g(x)} > 0 then sum(A.{x} * I.{g(x)}) / S.{g(x)} else sum(A.{x}) / count(*) end as {x}' for x in feat_acs if not "all" in x}
+            sel_grp = {x:f'case when S.{g(x)} > 0 then sum(A.{x} * I.{g(x)} / S.{g(x)}) else sum(A.{x} / S.ct) end as {x}' for x in feat_acs if not "all" in x}
 #             sel_grp = {x:f'sum(A.{x} * I.{g(x)} / greatest(1, S.{g(x)})) as {x}' for x in feat_acs if not "all" in x}
             sel_all = {x:f'{x.replace("all", "hisp")} + {x.replace("all", "other")} + {x.replace("all", "white")} as {x}' for x in feat_acs if "all" in x}
             sel_den = {x.replace("pop", "den"):f'{x} / areatot * 1000000 as {x.replace("pop", "den")}' for x in subpops.keys()}
@@ -288,7 +288,7 @@ from (
             sel_plan = {x:g(x) for x in self.bq.get_cols(self.get_plan())[1:]}
             qry = f"""
 select
-    {geoid}, county, dist_to_border, arealand, areawater, areatot, areacomputed, perimcomputed,
+    {geoid}, county, ct, dist_to_border, arealand, areawater, areatot, areacomputed, perimcomputed,
     4 * {np.pi} * areacomputed / (perimcomputed * perimcomputed) as polsby_popper,
     {ut.select(sel_den.values())},
     {ut.join(sel_pop.keys())},
@@ -303,6 +303,7 @@ from (
     from (
         select
             {geoid},
+            count(*) as ct,
             {ut.select(sel_pop.values(), 3)},
             sum(A.arealand) as arealand,
             sum(A.areawater) as areawater,
