@@ -268,7 +268,7 @@ from (
     from (
         select
             A.year,
-            I.{geoid_trg}
+            I.{geoid_trg},
             {ut.select(sel_grp.values(), 3)},
         from {tbl_src} as A
         join {self.get_intersection()} as I using ({geoid_src})
@@ -276,7 +276,7 @@ from (
             select
                 {geoid_src},
                 count(*) as ct,
-                {ut.select(sel_pop.values())},
+                {ut.select(sel_pop.values(), 4)},
             from {self.get_intersection()}
             group by {geoid_src}
         ) as S using ({geoid_src})
