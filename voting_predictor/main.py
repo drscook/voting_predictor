@@ -243,39 +243,40 @@ left join (
                         if not fields:
                             self.compute_other(df, name)
                     self.df_to_tbl(df, tbl_src, cols=['year', geoid_src, *features.keys()])    
+            feat_geo = ['county', 'dist_to_border', 'arealand', 'areawater', 'areatot', 'areacomputed', 'perimcomputed', 'polsby_popper']
             feat_acs = self.bq.get_cols(tbl_src)[2:]
             sel_pop = {x:f'sum({x}) as {x}' for x in subpops.keys()}
             g = lambda x: 'pop'+x[x.find('_'):]
+#             sel_grp = {x:f'sum(case when S.{g(x)} > 0 then A.{x} * I.{g(x)} / S.{g(x)} else A.{x} / S.ct end) as {x}' for x in feat_acs if not "all" in x}
+#             sel_all = {x:f'A.{x.replace("all", "hisp")} + A.{x.replace("all", "other")} + A.{x.replace("all", "white")} as {x}' for x in feat_acs if "all" in x}
+#             sel_den = {x.replace("pop", "den"):f'{x} / areatot * 1000000 as {x.replace("pop", "den")}' for x in subpops.keys()}
+            sel_grp = [f'sum(case when S.{g(x)} > 0 then A.{x} * I.{g(x)} / S.{g(x)} else A.{x} / S.ct end) as {x}' for x in feat_acs if not "all" in x]
+            sel_all = [f'A.{x.replace("all", "hisp")} + A.{x.replace("all", "other")} + A.{x.replace("all", "white")} as {x}' for x in feat_acs if "all" in x]
+            sel_den = [f'{x} / areatot * 1000000 as {x.replace("pop", "den")}' for x in subpops.keys()]
             
-            sel_grp = {x:f'sum(case when S.{g(x)} > 0 then A.{x} * I.{g(x)} / S.{g(x)} else A.{x} / S.ct end) as {x}' for x in feat_acs if not "all" in x}
-#             sel_grp = {x:f'sum(A.{x} * I.{g(x)} / greatest(1, S.{g(x)})) as {x}' for x in feat_acs if not "all" in x}
-            sel_all = {x:f'A.{x.replace("all", "hisp")} + A.{x.replace("all", "other")} + A.{x.replace("all", "white")} as {x}' for x in feat_acs if "all" in x}
-            sel_den = {x.replace("pop", "den"):f'{x} / areatot * 1000000 as {x.replace("pop", "den")}' for x in subpops.keys()}
-#             sel_geo = {x:f'min(T.{x}) as {x}' for x in ['dist_to_border', 'arealand', 'areawater', 'areatot', 'areacomputed', 'perimcomputed', 'polsby_popper']}
-            feat_geo = ['county', 'dist_to_border', 'arealand', 'areawater', 'areatot', 'areacomputed', 'perimcomputed', 'polsby_popper']
             qry = f"""
 select
-    year, {geoid_trg}
+    year, {geoid_trg},
     {ut.join(feat_geo)},
-    {ut.select(sel_den.values())},
+    {ut.select(sel_den)},
     {ut.join(feat_acs)},
 from (
     select
         A.*,
-        {ut.select(sel_all.values(), 2)},
+        {ut.select(sel_all, 2)},
         {ut.join(feat_geo)},
     from (
         select
             year,
             {geoid_trg},
-            {ut.select(sel_grp.values(), 3)},
+            {ut.select(sel_grp, 3)},
         from {tbl_src} as A
         join {self.get_intersection()} as I using ({geoid_src})
         join (
             select
                 {geoid_src},
                 count(*) as ct,
-                {ut.select(sel_pop.values(), 4)},
+                {ut.select(sel_pop, 4)},
             from {self.get_intersection()}
             group by {geoid_src}
         ) as S using ({geoid_src})
