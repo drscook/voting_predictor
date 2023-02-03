@@ -260,7 +260,7 @@ select
     {ut.join(feat_acs)},
 from (
     select
-        A.*
+        A.*,
         {ut.select(sel_all.values(), 2)},
         county,
         {ut.select(feat_geo)},
