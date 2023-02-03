@@ -252,18 +252,18 @@ left join (
             sel_all = {x:f'A.{x.replace("all", "hisp")} + A.{x.replace("all", "other")} + A.{x.replace("all", "white")} as {x}' for x in feat_acs if "all" in x}
             sel_den = {x.replace("pop", "den"):f'{x} / areatot * 1000000 as {x.replace("pop", "den")}' for x in subpops.keys()}
 #             sel_geo = {x:f'min(T.{x}) as {x}' for x in ['dist_to_border', 'arealand', 'areawater', 'areatot', 'areacomputed', 'perimcomputed', 'polsby_popper']}
-            feat_geo = ['dist_to_border', 'arealand', 'areawater', 'areatot', 'areacomputed', 'perimcomputed', 'polsby_popper']
+            feat_geo = ['county', 'dist_to_border', 'arealand', 'areawater', 'areatot', 'areacomputed', 'perimcomputed', 'polsby_popper']
             qry = f"""
 select
-    year, {geoid_trg}, county,
+    year, {geoid_trg}
+    {ut.join(feat_geo)},
     {ut.select(sel_den.values())},
     {ut.join(feat_acs)},
-    {ut.join(feat_geo)},
 from (
     select
         A.*,
         {ut.select(sel_all.values(), 2)},
-        county, {ut.join(feat_geo)},
+        {ut.join(feat_geo)},
     from (
         select
             year,
@@ -299,7 +299,7 @@ from (
             sel_plan = {x:g(x) for x in self.bq.get_cols(self.get_plan())[1:]}
             qry = f"""
 select
-    {geoid}, county, ct, dist_to_border, arealand, areawater, areatot, areacomputed, perimcomputed,
+    {geoid}, county, dist_to_border, arealand, areawater, areatot, areacomputed, perimcomputed,
     4 * {np.pi} * areacomputed / (perimcomputed * perimcomputed) as polsby_popper,
     {ut.select(sel_den.values())},
     {ut.join(sel_pop.keys())},
