@@ -275,7 +275,7 @@ from (
             select
                 {geoid_src},
                 count(*) as ct
-                {ut.select([f'sum({x}) as {x}' for x in subpops.keys()},
+                {ut.select([f'sum({x}) as {x}' for x in subpops.keys()]},
             from {self.get_intersection()}
             group by {geoid_src}
         ) as S using ({geoid_src})
