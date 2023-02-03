@@ -278,14 +278,14 @@ from (
         geoid = self.get_decade(geoid)
         tbl = f'{attr}.{self.state.abbr}_{geoid}'
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
+            print(tbl)
+            assert 1==2
             path, level, year, decade = self.parse(tbl)
             block = f'block{decade}'
             sel_pop = {x:f'sum({x}) as {x}' for x in subpops.keys()}
             sel_den = {x.replace("pop", "den"):f'{x} / areatot * 1000000 as {x.replace("pop", "den")}' for x in subpops.keys()}
             g = lambda x: f'join (select {geoid}, {x}, sum(pop_tot_all) as p from {self.get_intersection()} group by 1, 2 qualify row_number() over (partition by {geoid} order by p desc) = 1) using ({geoid})'
             sel_plan = {x:g(x) for x in self.bq.get_cols(self.get_plan())[1:]}
-#                 {ut.join(sel_den.keys())},
-#             {ut.select(sel_den.values(), 2)},
             qry = f"""
 select
     {geoid}, county, dist_to_border, arealand, areawater, areatot, areacomputed, perimcomputed,
