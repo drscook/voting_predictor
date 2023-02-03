@@ -286,7 +286,7 @@ from (
             sel_plan = {x:g(x) for x in self.bq.get_cols(self.get_plan())[1:]}
             qry = f"""
 select
-    {geoid}, county, dist_to_border, aland, awater, atot, areacomputed, perimcomputed,
+    {geoid}, county, dist_to_border, arealand, areawater, areatot, areacomputed, perimcomputed,
     4 * {np.pi} * areacomputed / (perimcomputed * perimcomputed) as polsby_popper,
     {ut.join(sel_den.keys())},
     {ut.join(sel_pop.keys())},
