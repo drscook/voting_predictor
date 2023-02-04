@@ -299,7 +299,7 @@ select
     st_distance(A.point, B.point) as dist,
 from {self.get_geo(geoid)} as A
 join {self.get_geo(geoid)} as B
-on st_intersects(A.geometry, B.geometry) and A.county = B.county"""
+on A.county = B.county and A.{geoid} <> B.{geoid} and st_intersects(A.geometry, B.geometry)"""
             self.qry_to_tbl(qry, tbl)
         return tbl
 
