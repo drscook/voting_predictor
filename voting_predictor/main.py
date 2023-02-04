@@ -301,7 +301,7 @@ from {self.get_geo(geoid)} as A
 join {self.get_geo(geoid)} as B
 on st_intersects(A.geometry, B.geometry)
 where A.county = B.county and {geoid} <> B.{geoid}"""
-            self.qry_to_tbl(qry, tbl)
+            self.qry_to_tbl(qry, tbl, True)
         return tbl
 
 
