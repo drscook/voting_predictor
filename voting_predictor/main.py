@@ -162,6 +162,9 @@ from (
                 year = int(year)
                 qry = f"""
 select 
+    year,
+    {geoid},
+    county,
     "{campaign}" as campaign,
     "{candidates}" as candidates,
     {year%4==2} as midterm,
@@ -173,7 +176,7 @@ select
     ifnull(D,0) / greatest(1, ifnull(D,0) + ifnull(R,0)) as pref_dem,
     ifnull(R,0) / greatest(1, ifnull(D,0) + ifnull(R,0)) as pref_rep,
     ntile({self.urbanizations}) over (order by den_tot_all asc) as urbanization,
-    A.* except ({geoid}),
+    A.* except (year, {geoid}, county),
 from {self.get_acs(level='tract', year=min(year, datetime.date.today().year-2), geoid_trg=geoid)} as A
 left join (
     select {geoid}, party, votes,
