@@ -286,7 +286,7 @@ from (
         return tbl_trg
     
     
-    def get_adjacency(self, geoid='tract2010'):
+    def get_adjacency(self, geoid='vtd2022'):
         attr = 'adjacency'
         tbl = f'{attr}.{self.state.abbr}_{geoid}'
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
@@ -303,7 +303,7 @@ on st_intersects(A.geometry, B.geometry) and A.county = B.county"""
         return tbl
 
 
-    def get_geo(self, geoid='tract2010'):
+    def get_geo(self, geoid='vtd2022'):
         attr = 'geo'
         geoid = self.get_decade(geoid)
         tbl = f'{attr}.{self.state.abbr}_{geoid}'
