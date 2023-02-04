@@ -284,6 +284,23 @@ from (
     join {self.get_geo(geoid_trg)} as T using ({geoid_trg}))"""
             self.qry_to_tbl(qry, tbl_trg)
         return tbl_trg
+    
+    
+    def get_adjacency(self, geoid='tract2010'):
+        attr = 'adjacency'
+        tbl = f'{attr}.{self.state.abbr}_{geoid}'
+        if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
+            qry = f"""
+select
+    A.{geoid},
+    B.{geoid},
+    A.county,
+    st_distance(A.point, B.point) as dist,
+from {self.get_geo(geoid)} as A
+join {self.get_geo(geoid)} as B
+on st_intersects(A.geometry, B.geometry) and A.county = B.county"""
+            self.qry_to_tbl(qry, tbl)
+        return tbl
 
 
     def get_geo(self, geoid='tract2010'):
@@ -305,6 +322,7 @@ select
     {ut.join(sel_pop.keys())},
     {ut.join(sel_plan.keys())},
     geometry,
+    st_centroid(geometry) as point,
 from (
     select 
         *,
