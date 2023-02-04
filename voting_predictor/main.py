@@ -293,8 +293,8 @@ from (
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
             qry = f"""
 select
-    A.{geoid},
-    B.{geoid},
+    A.{geoid} as x,
+    B.{geoid} as y,
     A.county,
     st_distance(A.point, B.point) as dist,
 from {self.get_geo(geoid)} as A
