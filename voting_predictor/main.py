@@ -300,7 +300,7 @@ select
 from {self.get_geo(geoid)} as A
 join {self.get_geo(geoid)} as B
 on st_intersects(A.geometry, B.geometry)
-where A.county = B.county and {geoid} <> B.{geoid}"""
+where A.county = B.county and not A.{geoid} = B.{geoid}"""
             self.qry_to_tbl(qry, tbl, True)
         return tbl
 
