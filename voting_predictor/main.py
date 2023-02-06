@@ -191,7 +191,14 @@ class Voting():
                 df[geoid+'_contracted'] = df.index
                 df = df.groupby('campaign').apply(contract)
                 self.df_to_tbl(df, tbl_src)
-            qry = f'select A.{geoid}_contracted, B.* from {tbl_src} as A join {self.get_combined} as B using ({geoid})'
+            qry = f"""
+select
+    A.{geoid}_contracted,
+    B.*,
+from {tbl_src} as A
+join {self.get_combined} as B using ({geoid}, campaign)
+
+"""
             self.qry_to_tbl(qry, tbl, True)
         return tbl
         
@@ -199,7 +206,7 @@ class Voting():
     def get_combined(self):
         if (self.state.abbr != 'TX') or (self.level != 'vtd'):
             return False
-        attr = 'final'
+        attr = 'combined'
         geoid = self.geoid
         tbl = f'{attr}.{self.state.abbr}_{geoid}'
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
