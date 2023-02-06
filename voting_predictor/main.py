@@ -150,28 +150,29 @@ class Voting():
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
             cols = self.bq.get_cols(votes.get_combined())
             sel_id = ['year', geoid, geoid+'_contract', 'county', 'campaign', 'candidates', 'midterm', 'federal']
-            sel_geo = {x:f'sum({x}) as {x}' for x in ['arealand', 'areawater', 'areatot', 'areacomputed']}
-            sel_feat = {x:f'sum({x}) as {x}' for x in cols[cols.index('pop_tot_all'):]}
+            sel_geo = {x:f'sum(B.{x}) as {x}' for x in ['arealand', 'areawater', 'areatot', 'areacomputed']}
+            sel_feat = {x:f'sum(B.{x}) as {x}' for x in cols[cols.index('pop_tot_all'):]}
             sel_den = [f'{x} / areatot * 1000000 as {x.replace("pop", "den")}' for x in subpops.keys()]
-            
             qry = f"""
 select
     {ut.join(sel_id)},
     vote_dem, vote_rep, vote_tot,
     vote_dem / greatest(1, vote_tot) as pref_dem,
     vote_rep / greatest(1, vote_tot) as pref_rep,
-    dist_to_border, {ut.join(sel_geo.keys())},
+    dist_to_border, {ut.join(sel_geo.keys())}, perimcomputed,
+    4 * {np.pi} * areacomputed / (perimcomputed * perimcomputed) as polsby_popper,
     ntile({self.urbanizations}) over (order by pop_tot_all / areatot asc) as urbanization,
     {ut.select(sel_den)},
     {ut.join(sel_feat.keys())},
 from (
     select
         {ut.join(sel_id)},
-        sum(vote_dem) as vote_dem,
-        sum(vote_rep) as vote_rep,
-        sum(vote_dem) + sum(vote_rep) as vote_tot,
-        min(dist_to_border) as dist_to_border,
+        sum(B.vote_dem) as vote_dem,
+        sum(B.vote_rep) as vote_rep,
+        sum(B.vote_dem) + sum(vote_rep) as vote_tot,
+        min(B.dist_to_border) as dist_to_border,
         {ut.select(sel_geo.values(), 2)},
+        min(A.perimcomputed) as perimcomputed,
         {ut.select(sel_feat.values(), 2)}
     from {self.get_contract()} as A
     join {self.get_combined()} as B using ({geoid}, campaign)
