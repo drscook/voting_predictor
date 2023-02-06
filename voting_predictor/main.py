@@ -182,12 +182,12 @@ from (
         return tbl
     
     
-class Voting_local(vp.Voting):
     def get_contract(self):
         if (self.state.abbr != 'TX') or (self.level != 'vtd'):
             return False
         attr = 'contract'
         geoid = self.geoid
+        geoid_contract = geoid+'_contract'
         tbl = f'{attr}.{self.state.abbr}_{geoid}'
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
             warnings.filterwarnings('ignore', message='.*divide by zero encountered.*')
@@ -198,9 +198,8 @@ class Voting_local(vp.Voting):
                 print(f'contracting {nodes.name}')
                 G = nx.from_pandas_edgelist(edges, source='x', target='y', edge_attr=edges.columns.difference(['x', 'y']).tolist())
                 G.remove_edges_from(nx.selfloop_edges(G))
-                # nodes['contraction'] = dict()
                 nx.set_node_attributes(G, nodes.to_dict(orient='index'))
-                contraction_dict = {node:node for node in G.nodes}
+                # contraction_dict = {node:node for node in G.nodes}
                 while True:
                     try:
                         v, src = max((node_data['vote_rate'], node) for node, node_data in G.nodes(data=True) if G.degree[node] > 0 and (node_data['vote_tot'] < 100 or node_data['vote_rate'] > 1))
@@ -213,10 +212,17 @@ class Voting_local(vp.Voting):
                     G.nodes[trg]['vote_rate'] = G.nodes[trg]['vote_tot'] / G.nodes[trg]['pop_vap_all']
                     nx.contracted_nodes(G, trg, src, False, False)  # contract nodes
                     # redirect everything previously contracted into src to trg
-                    for key, val in contraction_dict.items():
-                        if val == src:
-                            contraction_dict[key] = trg
+                    # for key, val in contraction_dict.items():
+                    #     if val == src:
+                    #         contraction_dict[key] = trg
                     # use min dist of contracted edges
+
+                    # mask = nodes[geoid+'_contract'] == src
+                    # nodes.loc[mask, geoid+'_contract'] = trg
+                    
+                    # nodes.query(geoid_contract+'==@src')[geoid_contract] = trg
+
+                    nodes[geoid_contract].replace(src, trg, inplace=True)
                     for node, edge_data in G.adj[trg].items():
                         if 'contraction' in edge_data:
                             edge_data['dist'] = min(edge_data['dist'], min(contracted_edge_data['dist'] for contracted_edge, contracted_edge_data in edge_data['contraction'].items()))
@@ -226,13 +232,13 @@ class Voting_local(vp.Voting):
             #         dist = edge_data['dist']
             #         contracted_dist, contracted_edge = min((contracted_edge_data['dist'], contracted_edge) for contracted_edge, contracted_edge_data in edge_data['contraction'].items())
             #         assert dist <= contracted_dist, f'contraction error - edge ({x},{y}) has dist={dist} which is larger than contracted edge {contracted_edge} with dist={contracted_dist}'
-                nodes[geoid+'_contract'] = pd.Series(contraction_dict)
+                # nodes[geoid+'_contract'] = pd.Series(contraction_dict)
                 return nodes
             attrs = ['pop_vap_all', 'vote_tot', 'perimcomputed']
             df = self.qry_to_df(f'select {geoid}, campaign, {ut.join(attrs)} from {self.get_combined()}').set_index(geoid)
             df['vote_rate'] = df['vote_tot'] / df['pop_vap_all']
-            df[geoid+'_contract'] = df.index
-            df = df.groupby('campaign').apply(contract)[[geoid+'_contract', 'campaign', 'perimcomputed']]
+            df[geoid_contract] = df.index
+            df = df.groupby('campaign').apply(contract)[[geoid_contract, 'campaign', 'perimcomputed']]
             self.df_to_tbl(df, tbl)
         return tbl
         
