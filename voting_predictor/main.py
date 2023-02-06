@@ -311,7 +311,7 @@ left join (
                             df['year'] = int(a[0])
                             df['midterm'] = (df['year']%4)==2
                             df['office'] = ut.replace(df['office'], repl)
-                            df['federal'] = df['federal'].str.contains('President|USSen|USRep')
+                            df['federal'] = df['office'].str.contains('President|USSen|USRep')
                             df['election'] = ut.join(a[1:-2], '_')
                             df['name'] = ut.replace(df['name'], repl)
                             df['incumbent'] = df['incumbent'] == 'Y'
