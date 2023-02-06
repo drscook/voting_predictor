@@ -55,8 +55,9 @@ class Voting():
             'acs_src':'acs',
             'acs':'combined',
             'election':'combined',
-            'combined':'contracted',
-            'contracted':set()}
+            'combined':'contract',
+            'contract':'final',
+            'final':set()}
         self.refresh = ut.setify(self.refresh)
         l = 0
         while l < len(self.refresh):
