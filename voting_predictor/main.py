@@ -390,6 +390,7 @@ select
     B.{geoid} as y,
     A.county,
     st_distance(A.point, B.point) as dist,
+    (A.perim + B.perim - st.perimeter(st.union_agg(A.geometry, B.geometry)) / 2 as perim_shared,
 from {self.get_geo(geoid)} as A
 join {self.get_geo(geoid)} as B
 on A.county = B.county and A.{geoid} <> B.{geoid} and st_intersects(A.geometry, B.geometry)"""
