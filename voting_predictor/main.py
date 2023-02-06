@@ -157,6 +157,7 @@ class Voting():
 select
     {ut.join(sel_id)},
     vote_dem, vote_rep, vote_tot,
+    vote_tot / greatest(1, pop_vap_all) as vote_rate,
     vote_dem / greatest(1, vote_tot) as pref_dem,
     vote_rep / greatest(1, vote_tot) as pref_rep,
     dist_to_border, {ut.join(sel_geo.keys())}, perimcomputed,
