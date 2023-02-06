@@ -146,7 +146,7 @@ class Voting():
         attr = 'contracted'
         geoid = self.geoid
         tbl = f'{attr}.{self.state.abbr}_{geoid}'
-        attrs = ['county', 'pop_vap_all', 'vote_tot', 'vote_rate']
+        attrs = ['pop_vap_all', 'vote_tot', 'vote_rate']
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
             tbl_src = tbl+'_src'
             if not self.bq.get_tbl(tbl_src, overwrite=(attr in self.refresh) & (tbl_src not in self.tbls)):
@@ -166,8 +166,7 @@ class Voting():
                             break
                         w, trg = min((edge_data['dist'], node) for node, edge_data in G.adj[src].items())
                         for key in attrs:
-                            if key != 'county':
-                                G.nodes[trg][key] += G.nodes[src][key]
+                            G.nodes[trg][key] += G.nodes[src][key]
                         G.nodes[trg]['vote_rate'] = G.nodes[trg]['vote_tot'] / G.nodes[trg]['pop_vap_all']
                         nx.contracted_nodes(G, trg, src, False, False)
                         contraction_dict[src] = trg
@@ -186,7 +185,7 @@ class Voting():
                     return nodes
 
 
-                df = self.qry_to_df(f'select {geoid}, {ut.join(attrs)} from {self.get_combined()}').set_index(geoid)
+                df = self.qry_to_df(f'select {geoid}, campaign, {ut.join(attrs)} from {self.get_combined()}').set_index(geoid)
     #             df = self.bq.tbl_to_df(self.get_combined(), rows=-1).set_index(geoid)
                 df['vote_rate'] = df['vote_tot'] / df['pop_vap_all']
                 df[geoid+'_contracted'] = df.index
