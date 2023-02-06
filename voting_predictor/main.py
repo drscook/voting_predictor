@@ -140,66 +140,98 @@ class Voting():
     def qry_to_df(self, qry):
         return self.bq.qry_to_df(qry)
     
-    def get_contracted(self):
+#     def get_final(self):
+#         if (self.state.abbr != 'TX') or (self.level != 'vtd'):
+#             return False
+#         attr = 'final'
+#         geoid = self.geoid
+#         tbl = f'{attr}.{self.state.abbr}_{geoid}'
+#         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
+#             feat_vote = ['
+#             qry = f"""
+# select
+#     year,
+#     {geoid},
+#     {geoid}_contract,
+#     county,
+#     campaign,
+#     candidates,
+#     midterm,
+#     federal,
+#     sum(vote_dem) as vote_dem,
+#     sum(vote_rep) as vote_rep,
+#     sum(vote_dem) + sum(vote_rep) as vote_tot
+#     (sum(vote_rep) + sum(vote_dem)) / greatest(1, sum(pop_vap_all)) as vote_rate,
+#     sum(vote_dem) / greatest(1, sum(vote_rep) + sum(vote_dem)) as pref_dem,
+#     sum(vote_rep) / greatest(1, sum(vote_rep) + sum(vote_dem)) as pref_rep,
+    
+    
+    
+#     min(dist_to_border) as dist_to_border,
+    
+    
+#     ntile({self.urbanizations}) over (order by sum(pop_tot_all) / sum(areatot) asc) as urbanization,
+#     sum(pop_tot_all) as pop_tot_all
+    
+    
+    
+    
+#     B.*,
+# from {self.get_contract()} as A
+# join {self.get_combined()} as B using ({geoid}, campaign)"""
+#             self.qry_to_tbl(qry, tbl, True)
+
+    
+    
+    def get_contract(self):
         if (self.state.abbr != 'TX') or (self.level != 'vtd'):
             return False
-        attr = 'contracted'
+        attr = 'contract'
         geoid = self.geoid
         tbl = f'{attr}.{self.state.abbr}_{geoid}'
         attrs = ['pop_vap_all', 'vote_tot', 'vote_rate']
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
-            tbl_src = tbl+'_src'
-            if not self.bq.get_tbl(tbl_src, overwrite=(attr in self.refresh) & (tbl_src not in self.tbls)):
-                warnings.filterwarnings('ignore', message='.*divide by zero encountered.*')
-                warnings.filterwarnings('ignore', message='.*invalid value encountered in true_divide.*')
-                edges = self.bq.tbl_to_df(self.get_adjacency(), rows=-1)
-                def contract(nodes):
-                    print(f'contracting {nodes.name}')
-                    G = nx.from_pandas_edgelist(edges, source='x', target='y', edge_attr=edges.columns.difference(['x', 'y']).tolist())
-                    G.remove_edges_from(nx.selfloop_edges(G))
-                    nx.set_node_attributes(G, nodes.to_dict(orient='index'))
-                    contraction_dict = {node:node for node in G.nodes}
-                    while True:
-                        try:
-                            v, src = max((node_data['vote_rate'], node) for node, node_data in G.nodes(data=True) if G.degree[node] > 0 and (node_data['vote_tot'] < 100 or node_data['vote_rate'] > 1))
-                        except ValueError:
-                            break
-                        w, trg = min((edge_data['dist'], node) for node, edge_data in G.adj[src].items())
-                        for key in attrs:
-                            G.nodes[trg][key] += G.nodes[src][key]
-                        G.nodes[trg]['vote_rate'] = G.nodes[trg]['vote_tot'] / G.nodes[trg]['pop_vap_all']
-                        nx.contracted_nodes(G, trg, src, False, False)
-                        contraction_dict[src] = trg
+            warnings.filterwarnings('ignore', message='.*divide by zero encountered.*')
+            warnings.filterwarnings('ignore', message='.*invalid value encountered in true_divide.*')
+            edges = self.bq.tbl_to_df(self.get_adjacency(), rows=-1)
+            def contract(nodes):
+                print(f'contracting {nodes.name}')
+                G = nx.from_pandas_edgelist(edges, source='x', target='y', edge_attr=edges.columns.difference(['x', 'y']).tolist())
+                G.remove_edges_from(nx.selfloop_edges(G))
+                nx.set_node_attributes(G, nodes.to_dict(orient='index'))
+                contraction_dict = {node:node for node in G.nodes}
+                while True:
+                    try:
+                        v, src = max((node_data['vote_rate'], node) for node, node_data in G.nodes(data=True) if G.degree[node] > 0 and (node_data['vote_tot'] < 100 or node_data['vote_rate'] > 1))
+                    except ValueError:
+                        break
+                    w, trg = min((edge_data['dist'], node) for node, edge_data in G.adj[src].items())
+                    for key in attrs:
+                        G.nodes[trg][key] += G.nodes[src][key]
+                    G.nodes[trg]['vote_rate'] = G.nodes[trg]['vote_tot'] / G.nodes[trg]['pop_vap_all']
+                    nx.contracted_nodes(G, trg, src, False, False)
+                    contraction_dict[src] = trg
 
-                        for node, edge_data in G.adj[trg].items():
-                            if 'contraction' in edge_data:
-                                edge_data['dist'] = min(edge_data['dist'], min(contracted_edge_data['dist'] for contracted_edge, contracted_edge_data in edge_data['contraction'].items()))
+                    for node, edge_data in G.adj[trg].items():
+                        if 'contraction' in edge_data:
+                            edge_data['dist'] = min(edge_data['dist'], min(contracted_edge_data['dist'] for contracted_edge, contracted_edge_data in edge_data['contraction'].items()))
 
-                # check that we did min dist on contracted edge correctly
-                # for x, y, edge_data in G.edges(data=True):
-                #     if 'contraction' in edge_data:
-                #         dist = edge_data['dist']
-                #         contracted_dist, contracted_edge = min((contracted_edge_data['dist'], contracted_edge) for contracted_edge, contracted_edge_data in edge_data['contraction'].items())
-                #         assert dist <= contracted_dist, f'contraction error - edge ({x},{y}) has dist={dist} which is larger than contracted edge {contracted_edge} with dist={contracted_dist}'
-                    nodes[geoid+'_contracted'] = pd.Series(contraction_dict)
-                    return nodes
+            # check that we did min dist on contracted edge correctly
+            # for x, y, edge_data in G.edges(data=True):
+            #     if 'contraction' in edge_data:
+            #         dist = edge_data['dist']
+            #         contracted_dist, contracted_edge = min((contracted_edge_data['dist'], contracted_edge) for contracted_edge, contracted_edge_data in edge_data['contraction'].items())
+            #         assert dist <= contracted_dist, f'contraction error - edge ({x},{y}) has dist={dist} which is larger than contracted edge {contracted_edge} with dist={contracted_dist}'
+                nodes[geoid+'_contract'] = pd.Series(contraction_dict)
+                return nodes
 
 
-                df = self.qry_to_df(f'select {geoid}, campaign, {ut.join(attrs)} from {self.get_combined()}').set_index(geoid)
-    #             df = self.bq.tbl_to_df(self.get_combined(), rows=-1).set_index(geoid)
-                df['vote_rate'] = df['vote_tot'] / df['pop_vap_all']
-                df[geoid+'_contracted'] = df.index
-                df = df.groupby('campaign').apply(contract)
-                self.df_to_tbl(df, tbl_src)
-            qry = f"""
-select
-    A.{geoid}_contracted,
-    B.*,
-from {tbl_src} as A
-join {self.get_combined} as B using ({geoid}, campaign)
-
-"""
-            self.qry_to_tbl(qry, tbl, True)
+            df = self.qry_to_df(f'select {geoid}, campaign, {ut.join(attrs)} from {self.get_combined()}').set_index(geoid)
+#             df = self.bq.tbl_to_df(self.get_combined(), rows=-1).set_index(geoid)
+            df['vote_rate'] = df['vote_tot'] / df['pop_vap_all']
+            df[geoid+'_contract'] = df.index
+            df = df.groupby('campaign').apply(contract)
+            self.df_to_tbl(df, tbl)
         return tbl
         
 
@@ -232,8 +264,8 @@ select
     county,
     "{campaign}" as campaign,
     "{candidates}" as candidates,
-    {year%4==2} as midterm,
-    {'President' in campaign or 'USSen' in campaign or 'USRep' in campaign} as federal,
+    --{year%4==2} as midterm,
+    --{'President' in campaign or 'USSen' in campaign or 'USRep' in campaign} as federal,
     ifnull(D,0) as vote_dem,
     ifnull(R,0) as vote_rep,
     ifnull(D,0) + ifnull(R,0) as vote_tot,
@@ -268,7 +300,7 @@ left join (
                 url = f'https://data.capitol.texas.gov/dataset/35b16aee-0bb0-4866-b1ec-859f1f044241/resource/b9ebdbdb-3e31-4c98-b158-0e2993b05efc/download/{zip_file.name}'
                 download(zip_file, url)
                 L = []
-                cols = [self.geoid, 'year', 'office', 'election', 'name', 'party', 'incumbent', 'votes']
+                cols = [self.geoid, 'year', 'midterm', 'office', 'federal', 'election', 'name', 'party', 'incumbent', 'votes']
                 for file in path.iterdir():
                     a = ut.prep(file.stem.split('_'))
                     if ('general' in a) & ('returns' in a):
@@ -277,7 +309,9 @@ left join (
                         if mask.any():
                             repl = {(' ', '.', ','): ''}
                             df['year'] = int(a[0])
+                            df['midterm'] = (df['year']%4)==2
                             df['office'] = ut.replace(df['office'], repl)
+                            df['federal'] = df['federal'].str.contains('President|USSen|USRep')
                             df['election'] = ut.join(a[1:-2], '_')
                             df['name'] = ut.replace(df['name'], repl)
                             df['incumbent'] = df['incumbent'] == 'Y'
