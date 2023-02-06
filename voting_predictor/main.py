@@ -268,7 +268,7 @@ select
     {'President' in campaign or 'USSen' in campaign or 'USRep' in campaign} as federal,
     ifnull(D,0) as vote_dem,
     ifnull(R,0) as vote_rep,
-    --ifnull(D,0) + ifnull(R,0) as vote_tot,
+    ifnull(D,0) + ifnull(R,0) as vote_tot,
     --(ifnull(D,0) + ifnull(R,0)) / greatest(1, pop_vap_all) as vote_rate,
     --ifnull(D,0) / greatest(1, ifnull(D,0) + ifnull(R,0)) as pref_dem,
     --ifnull(R,0) / greatest(1, ifnull(D,0) + ifnull(R,0)) as pref_rep,
