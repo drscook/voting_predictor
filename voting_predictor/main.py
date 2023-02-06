@@ -223,7 +223,7 @@ from (
             df = self.qry_to_df(f'select {geoid}, campaign, {ut.join(attrs)} from {self.get_combined()}').set_index(geoid)
             df['vote_rate'] = df['vote_tot'] / df['pop_vap_all']
             df[geoid+'_contract'] = df.index
-            df = df.groupby('campaign').apply(contract)[geoid, geoid+'_contract', 'campaign'
+            df = df.groupby('campaign').apply(contract)[geoid, geoid+'_contract', 'campaign']
             self.df_to_tbl(df, tbl)
         return tbl
         
