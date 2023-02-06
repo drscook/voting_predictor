@@ -147,7 +147,7 @@ class Voting():
         geoid = self.geoid
         tbl = f'{attr}.{self.state.abbr}_{geoid}'
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
-            cols = votes.bq.get_cols(votes.get_combined())
+            cols = self.bq.get_cols(votes.get_combined())
             sel_id = ['year', geoid, geoid+'_contract', 'county', 'campaign', 'candidates', 'midterm', 'federal']
             sel_geo = {x:f'sum({X}) as {x}' for x in ['arealand', 'areawater', 'areatot', 'areacomputed']}
             sel_feat = {x:f'sum({X}) as {x}' for x in cols[cols.index('pop_tot_all')]}
