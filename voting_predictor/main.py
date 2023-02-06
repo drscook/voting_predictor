@@ -186,7 +186,7 @@ class Voting():
                     return nodes
 
 
-                df = self.qry_to_df(f'select {geoid}, {ut.join(attrs)} from {self.get_combined()}')).set_index(geoid)
+                df = self.qry_to_df(f'select {geoid}, {ut.join(attrs)} from {self.get_combined()}').set_index(geoid)
     #             df = self.bq.tbl_to_df(self.get_combined(), rows=-1).set_index(geoid)
                 df['vote_rate'] = df['vote_tot'] / df['pop_vap_all']
                 df[geoid+'_contracted'] = df.index
