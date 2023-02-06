@@ -149,7 +149,7 @@ class Voting():
         tbl = f'{attr}.{self.state.abbr}_{geoid}'
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
             cols = self.bq.get_cols(self.get_combined())
-            sel_id = ['year', geoid, geoid+'_contract', 'county', 'campaign', 'candidates', 'midterm', 'federal']
+            sel_id = ['year', geoid+'_contract', 'county', 'campaign', 'candidates', 'midterm', 'federal']
             sel_geo = {x:f'sum(B.{x}) as {x}' for x in ['arealand', 'areawater', 'areatot', 'areacomputed']}
             sel_feat = {x:f'sum(B.{x}) as {x}' for x in cols[cols.index('pop_tot_all'):]}
             sel_den = [f'{x} / areatot * 1000000 as {x.replace("pop", "den")}' for x in subpops.keys()]
