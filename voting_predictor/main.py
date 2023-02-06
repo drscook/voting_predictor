@@ -149,23 +149,33 @@ class Voting():
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
             cols = self.bq.get_cols(votes.get_combined())
             sel_id = ['year', geoid, geoid+'_contract', 'county', 'campaign', 'candidates', 'midterm', 'federal']
-            sel_geo = {x:f'sum({X}) as {x}' for x in ['arealand', 'areawater', 'areatot', 'areacomputed']}
-            sel_feat = {x:f'sum({X}) as {x}' for x in cols[cols.index('pop_tot_all')]}
+            sel_geo = {x:f'sum({x}) as {x}' for x in ['arealand', 'areawater', 'areatot', 'areacomputed']}
+            sel_feat = {x:f'sum({x}) as {x}' for x in cols[cols.index('pop_tot_all'):]}
+            sel_den = [f'{x} / areatot * 1000000 as {x.replace("pop", "den")}' for x in vp.subpops.keys()]
             
             qry = f"""
 select
-    {ut.select(sel_id)}
-    sum(vote_dem) as vote_dem,
-    sum(vote_rep) as vote_rep,
-    sum(vote_dem) + sum(vote_rep) as vote_tot
-    min(dist_to_border) as dist_to_border,
-    {ut.select(sel_geo.values())},
-    --ntile({self.urbanizations}) over (order by sum(pop_tot_all) / sum(areatot) asc) as urbanization,
-    {ut.select(sel_feat.values())}
-from {self.get_contract()} as A
-join {self.get_combined()} as B using ({geoid}, campaign)"""
+    {ut.join(sel_id)},
+    vote_dem, vote_rep, vote_tot,
+    vote_dem / greatest(1, vote_tot) as pref_dem,
+    vote_rep / greatest(1, vote_tot) as pref_rep,
+    dist_to_border, {ut.join(sel_geo.keys())},
+    ntile({self.urbanizations}) over (order by pop_tot_all / areatot asc) as urbanization,
+    {ut.select(sel_den)},
+    {ut.join(sel_feat.keys())},
+from (
+    select
+        {ut.join(sel_id)},
+        sum(vote_dem) as vote_dem,
+        sum(vote_rep) as vote_rep,
+        sum(vote_dem) + sum(vote_rep) as vote_tot,
+        min(dist_to_border) as dist_to_border,
+        {ut.select(sel_geo.values(), 2)},
+        {ut.select(sel_feat.values(), 2)}
+    from {self.get_contract()} as A
+    join {self.get_combined()} as B using ({geoid}, campaign)
+    group by {ut.join(sel_id)})"""
             self.qry_to_tbl(qry, tbl, True)
-
     
     
     def get_contract(self):
@@ -209,13 +219,10 @@ join {self.get_combined()} as B using ({geoid}, campaign)"""
             #         assert dist <= contracted_dist, f'contraction error - edge ({x},{y}) has dist={dist} which is larger than contracted edge {contracted_edge} with dist={contracted_dist}'
                 nodes[geoid+'_contract'] = pd.Series(contraction_dict)
                 return nodes
-
-
             df = self.qry_to_df(f'select {geoid}, campaign, {ut.join(attrs)} from {self.get_combined()}').set_index(geoid)
-#             df = self.bq.tbl_to_df(self.get_combined(), rows=-1).set_index(geoid)
             df['vote_rate'] = df['vote_tot'] / df['pop_vap_all']
             df[geoid+'_contract'] = df.index
-            df = df.groupby('campaign').apply(contract)
+            df = df.groupby('campaign').apply(contract)[geoid, geoid+'_contract', 'campaign'
             self.df_to_tbl(df, tbl)
         return tbl
         
@@ -342,6 +349,7 @@ left join (
 select
     year, {geoid_trg},
     {ut.join(feat_geo)},
+    ntile({self.urbanizations}) over (order by pop_tot_all / areatot asc) as urbanization,
     {ut.select(sel_den)},
     {ut.join(feat_acs)},
 from (
