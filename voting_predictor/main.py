@@ -264,8 +264,6 @@ select
     county,
     "{campaign}" as campaign,
     "{candidates}" as candidates,
-    midterm,
-    federal,
     {year%4==2} as midterm,
     {'President' in campaign or 'USSen' in campaign or 'USRep' in campaign} as federal,
     ifnull(D,0) as vote_dem,
@@ -278,7 +276,7 @@ select
     A.* except (year, {geoid}, county),
 from {self.get_acs(level='tract', year=min(year, datetime.date.today().year-2), geoid_trg=geoid)} as A
 left join (
-    select {geoid}, midterm, federal, party, votes,
+    select {geoid}, party, votes,
     from {self.get_election()}
     where office = "{office}" and year = {year})
     pivot(sum(votes) for party in ("D", "R")
@@ -302,7 +300,8 @@ left join (
                 url = f'https://data.capitol.texas.gov/dataset/35b16aee-0bb0-4866-b1ec-859f1f044241/resource/b9ebdbdb-3e31-4c98-b158-0e2993b05efc/download/{zip_file.name}'
                 download(zip_file, url)
                 L = []
-                cols = [self.geoid, 'year', 'midterm', 'office', 'federal', 'election', 'name', 'party', 'incumbent', 'votes']
+#                 cols = [self.geoid, 'year', 'office', 'midterm', 'federal', 'election', 'name', 'party', 'incumbent', 'votes']
+                cols = [self.geoid, 'year', 'office', 'election', 'name', 'party', 'incumbent', 'votes']
                 for file in path.iterdir():
                     a = ut.prep(file.stem.split('_'))
                     if ('general' in a) & ('returns' in a):
@@ -311,9 +310,9 @@ left join (
                         if mask.any():
                             repl = {(' ', '.', ','): ''}
                             df['year'] = int(a[0])
-                            df['midterm'] = (df['year']%4)==2
                             df['office'] = ut.replace(df['office'], repl)
-                            df['federal'] = df['office'].str.contains('President|USSen|USRep')
+#                             df['midterm'] = (df['year']%4)==2
+#                             df['federal'] = df['office'].str.contains('President|USSen|USRep')
                             df['election'] = ut.join(a[1:-2], '_')
                             df['name'] = ut.replace(df['name'], repl)
                             df['incumbent'] = df['incumbent'] == 'Y'
