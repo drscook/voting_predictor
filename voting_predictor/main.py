@@ -278,7 +278,7 @@ select
     A.* except (year, {geoid}, county),
 from {self.get_acs(level='tract', year=min(year, datetime.date.today().year-2), geoid_trg=geoid)} as A
 left join (
-    select {geoid}, midterm, federl, party, votes,
+    select {geoid}, midterm, federal, party, votes,
     from {self.get_election()}
     where office = "{office}" and year = {year})
     pivot(sum(votes) for party in ("D", "R")
