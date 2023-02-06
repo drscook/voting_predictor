@@ -140,46 +140,31 @@ class Voting():
     def qry_to_df(self, qry):
         return self.bq.qry_to_df(qry)
     
-#     def get_final(self):
-#         if (self.state.abbr != 'TX') or (self.level != 'vtd'):
-#             return False
-#         attr = 'final'
-#         geoid = self.geoid
-#         tbl = f'{attr}.{self.state.abbr}_{geoid}'
-#         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
-#             feat_vote = ['
-#             qry = f"""
-# select
-#     year,
-#     {geoid},
-#     {geoid}_contract,
-#     county,
-#     campaign,
-#     candidates,
-#     midterm,
-#     federal,
-#     sum(vote_dem) as vote_dem,
-#     sum(vote_rep) as vote_rep,
-#     sum(vote_dem) + sum(vote_rep) as vote_tot
-#     (sum(vote_rep) + sum(vote_dem)) / greatest(1, sum(pop_vap_all)) as vote_rate,
-#     sum(vote_dem) / greatest(1, sum(vote_rep) + sum(vote_dem)) as pref_dem,
-#     sum(vote_rep) / greatest(1, sum(vote_rep) + sum(vote_dem)) as pref_rep,
-    
-    
-    
-#     min(dist_to_border) as dist_to_border,
-    
-    
-#     ntile({self.urbanizations}) over (order by sum(pop_tot_all) / sum(areatot) asc) as urbanization,
-#     sum(pop_tot_all) as pop_tot_all
-    
-    
-    
-    
-#     B.*,
-# from {self.get_contract()} as A
-# join {self.get_combined()} as B using ({geoid}, campaign)"""
-#             self.qry_to_tbl(qry, tbl, True)
+    def get_final(self):
+        if (self.state.abbr != 'TX') or (self.level != 'vtd'):
+            return False
+        attr = 'final'
+        geoid = self.geoid
+        tbl = f'{attr}.{self.state.abbr}_{geoid}'
+        if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
+            cols = votes.bq.get_cols(votes.get_combined())
+            sel_id = ['year', geoid, geoid+'_contract', 'county', 'campaign', 'candidates', 'midterm', 'federal']
+            sel_geo = {x:f'sum({X}) as {x}' for x in ['arealand', 'areawater', 'areatot', 'areacomputed']}
+            sel_feat = {x:f'sum({X}) as {x}' for x in cols[cols.index('pop_tot_all')]}
+            
+            qry = f"""
+select
+    {ut.select(sel_id)}
+    sum(vote_dem) as vote_dem,
+    sum(vote_rep) as vote_rep,
+    sum(vote_dem) + sum(vote_rep) as vote_tot
+    min(dist_to_border) as dist_to_border,
+    {ut.select(sel_geo.values())},
+    --ntile({self.urbanizations}) over (order by sum(pop_tot_all) / sum(areatot) asc) as urbanization,
+    {ut.select(sel_feat.values())}
+from {self.get_contract()} as A
+join {self.get_combined()} as B using ({geoid}, campaign)"""
+            self.qry_to_tbl(qry, tbl, True)
 
     
     
