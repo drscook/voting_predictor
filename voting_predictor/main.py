@@ -139,10 +139,10 @@ class Voting():
     def qry_to_df(self, qry):
         return self.bq.qry_to_df(qry)
     
-    def run_contraction(self):
+    def get_contraction(self):
         if (self.state.abbr != 'TX') or (self.level != 'vtd'):
             return False
-        attr = 'contract'
+        attr = 'contraction'
         geoid = self.geoid
         tbl = f'{attr}.{self.state.abbr}_{geoid}'
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
