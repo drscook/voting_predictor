@@ -192,12 +192,20 @@ from (
             warnings.filterwarnings('ignore', message='.*divide by zero encountered.*')
             warnings.filterwarnings('ignore', message='.*invalid value encountered in true_divide.*')
             edges = self.bq.tbl_to_df(self.get_adjacency(), rows=-1)
-            def contract(nodes):
+            
+            def node_contract(G, trg, src):
+                nx.contracted_nodes(G, trg, src, False, False)
+                c = 'contraction'
+                data = G.nodes[trg][c]
+                if c in data[src]:
+                    data.update(data[src][c])
+                    data[src].pop(c)
+
+            def graph_contract(nodes):
                 print(f'contracting {nodes.name}')
                 G = nx.from_pandas_edgelist(edges, source='x', target='y', edge_attr=edges.columns.difference(['x', 'y']).tolist())
                 G.remove_edges_from(nx.selfloop_edges(G))
                 nx.set_node_attributes(G, nodes.to_dict(orient='index'))
-                contraction_dict = {node:node for node in G.nodes}
                 while True:
                     try:
                         v, src = max((node_data['vote_rate'], node) for node, node_data in G.nodes(data=True) if G.degree[node] > 0 and (node_data['vote_tot'] < 100 or node_data['vote_rate'] > 1))
@@ -208,26 +216,29 @@ from (
                         G.nodes[trg][key] += G.nodes[src][key]
                     G.nodes[trg]['perimcomputed'] -= (2*G.edges[src,trg]['perim_shared'])
                     G.nodes[trg]['vote_rate'] = G.nodes[trg]['vote_tot'] / G.nodes[trg]['pop_vap_all']
-                    nx.contracted_nodes(G, trg, src, False, False)
-                    contraction_dict[src] = trg
-
+                    node_contract(G, trg, src)
                     for node, edge_data in G.adj[trg].items():
                         if 'contraction' in edge_data:
                             edge_data['dist'] = min(edge_data['dist'], min(contracted_edge_data['dist'] for contracted_edge, contracted_edge_data in edge_data['contraction'].items()))
-
             # check that we did min dist on contracted edge correctly
             # for x, y, edge_data in G.edges(data=True):
             #     if 'contraction' in edge_data:
             #         dist = edge_data['dist']
             #         contracted_dist, contracted_edge = min((contracted_edge_data['dist'], contracted_edge) for contracted_edge, contracted_edge_data in edge_data['contraction'].items())
             #         assert dist <= contracted_dist, f'contraction error - edge ({x},{y}) has dist={dist} which is larger than contracted edge {contracted_edge} with dist={contracted_dist}'
+                contraction_dict = dict()
+                for node, node_data in G.nodes(data=True):
+                    contraction_dict[node] = node
+                    if 'contraction' in node_data:
+                        for contracted_node in node_data['contraction'].keys():
+                            contraction_dict[contracted_node] = node
                 nodes[geoid+'_contract'] = pd.Series(contraction_dict)
                 return nodes
             attrs = ['pop_vap_all', 'vote_tot', 'perimcomputed']
             df = self.qry_to_df(f'select {geoid}, campaign, {ut.join(attrs)} from {self.get_combined()}').set_index(geoid)
             df['vote_rate'] = df['vote_tot'] / df['pop_vap_all']
             df[geoid+'_contract'] = df.index
-            df = df.groupby('campaign').apply(contract)[[geoid+'_contract', 'campaign', 'perimcomputed']]
+            df = df.groupby('campaign').apply(graph_contract)[[geoid+'_contract', 'campaign', 'perimcomputed']]
             self.df_to_tbl(df, tbl)
         return tbl
         
