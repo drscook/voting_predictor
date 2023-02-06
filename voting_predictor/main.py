@@ -153,6 +153,7 @@ class Voting():
             edges = self.bq.tbl_to_df(self.get_adjacency(), rows=-1)
             
             def contract(nodes):
+                print(f'contracting {nodes.name}')
                 G = nx.from_pandas_edgelist(edges, source='x', target='y', edge_attr=edges.columns.difference(['x', 'y']).tolist())
                 G.remove_edges_from(nx.selfloop_edges(G))
                 nx.set_node_attributes(G, nodes.to_dict(orient='index'))
