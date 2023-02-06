@@ -177,7 +177,8 @@ from (
     from {self.get_contract()} as A
     join {self.get_combined()} as B using ({geoid}, campaign)
     group by {ut.join(sel_id)})"""
-            self.qry_to_tbl(qry, tbl, True)
+            self.qry_to_tbl(qry, tbl)
+        return tbl
     
     
     def get_contract(self):
