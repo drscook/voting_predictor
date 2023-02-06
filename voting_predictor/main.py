@@ -53,9 +53,10 @@ class Voting():
             'geo':{'acs','adjacency'},
             'adjacency':set(),
             'acs_src':'acs',
-            'acs':'final',
-            'election':'final',
-            'final':set()}
+            'acs':'combined',
+            'election':'combined',
+            'combined':'contraction',
+            'contraction':set()}
         self.refresh = ut.setify(self.refresh)
         l = 0
         while l < len(self.refresh):
@@ -182,7 +183,7 @@ class Voting():
                 nodes['contract'] = pd.Series(contraction_dict)
                 return nodes
             
-            df = self.bq.tbl_to_df(self.get_final(), rows=-1).set_index(geoid)
+            df = self.bq.tbl_to_df(self.get_combined(), rows=-1).set_index(geoid)
             df['vote_rate'] = df['vote_tot'] / df['pop_vap_all']
             df['contract'] = df.index
             df = df.groupby('campaign').apply(contract)
@@ -190,7 +191,7 @@ class Voting():
         return tbl
         
 
-    def get_final(self):
+    def get_combined(self):
         if (self.state.abbr != 'TX') or (self.level != 'vtd'):
             return False
         attr = 'final'
