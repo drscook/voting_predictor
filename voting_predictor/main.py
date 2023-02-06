@@ -152,7 +152,7 @@ class Voting():
             sel_id = ['year', geoid, geoid+'_contract', 'county', 'campaign', 'candidates', 'midterm', 'federal']
             sel_geo = {x:f'sum({x}) as {x}' for x in ['arealand', 'areawater', 'areatot', 'areacomputed']}
             sel_feat = {x:f'sum({x}) as {x}' for x in cols[cols.index('pop_tot_all'):]}
-            sel_den = [f'{x} / areatot * 1000000 as {x.replace("pop", "den")}' for x in vp.subpops.keys()]
+            sel_den = [f'{x} / areatot * 1000000 as {x.replace("pop", "den")}' for x in subpops.keys()]
             
             qry = f"""
 select
@@ -390,7 +390,7 @@ select
     B.{geoid} as y,
     A.county,
     st_distance(A.point, B.point) as dist,
-    (A.perim + B.perim - st.perimeter(st.union_agg(A.geometry, B.geometry)) / 2 as perim_shared,
+    (A.perimcomputed + B.perimcomputed - st_perimeter(st_union(A.geometry, B.geometry))) / 2 as perim_shared,
 from {self.get_geo(geoid)} as A
 join {self.get_geo(geoid)} as B
 on A.county = B.county and A.{geoid} <> B.{geoid} and st_intersects(A.geometry, B.geometry)"""
