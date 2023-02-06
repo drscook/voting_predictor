@@ -55,8 +55,8 @@ class Voting():
             'acs_src':'acs',
             'acs':'combined',
             'election':'combined',
-            'combined':'contraction',
-            'contraction':set()}
+            'combined':'contracted',
+            'contracted':set()}
         self.refresh = ut.setify(self.refresh)
         l = 0
         while l < len(self.refresh):
@@ -140,10 +140,10 @@ class Voting():
     def qry_to_df(self, qry):
         return self.bq.qry_to_df(qry)
     
-    def get_contraction(self):
+    def get_contracted(self):
         if (self.state.abbr != 'TX') or (self.level != 'vtd'):
             return False
-        attr = 'contraction'
+        attr = 'contracted'
         geoid = self.geoid
         tbl = f'{attr}.{self.state.abbr}_{geoid}'
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
