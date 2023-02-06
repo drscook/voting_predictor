@@ -180,12 +180,12 @@ class Voting():
             #         dist = edge_data['dist']
             #         contracted_dist, contracted_edge = min((contracted_edge_data['dist'], contracted_edge) for contracted_edge, contracted_edge_data in edge_data['contraction'].items())
             #         assert dist <= contracted_dist, f'contraction error - edge ({x},{y}) has dist={dist} which is larger than contracted edge {contracted_edge} with dist={contracted_dist}'
-                nodes['contract'] = pd.Series(contraction_dict)
+                nodes['contracted'] = pd.Series(contraction_dict)
                 return nodes
             
             df = self.bq.tbl_to_df(self.get_combined(), rows=-1).set_index(geoid)
             df['vote_rate'] = df['vote_tot'] / df['pop_vap_all']
-            df['contract'] = df.index
+            df['contracted'] = df.index
             df = df.groupby('campaign').apply(contract)
             self.df_to_tbl(df, tbl)
         return tbl
