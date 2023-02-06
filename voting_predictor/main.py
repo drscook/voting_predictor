@@ -185,7 +185,6 @@ from (
         attr = 'contract'
         geoid = self.geoid
         tbl = f'{attr}.{self.state.abbr}_{geoid}'
-        attrs = ['pop_vap_all', 'vote_tot', 'vote_rate']
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
             warnings.filterwarnings('ignore', message='.*divide by zero encountered.*')
             warnings.filterwarnings('ignore', message='.*invalid value encountered in true_divide.*')
@@ -204,6 +203,7 @@ from (
                     w, trg = min((edge_data['dist'], node) for node, edge_data in G.adj[src].items())
                     for key in attrs:
                         G.nodes[trg][key] += G.nodes[src][key]
+                    G.nodes[trg]['perimcomputed'] -= (2*G.edges[src,trg]['perim_shared'])
                     G.nodes[trg]['vote_rate'] = G.nodes[trg]['vote_tot'] / G.nodes[trg]['pop_vap_all']
                     nx.contracted_nodes(G, trg, src, False, False)
                     contraction_dict[src] = trg
@@ -220,10 +220,11 @@ from (
             #         assert dist <= contracted_dist, f'contraction error - edge ({x},{y}) has dist={dist} which is larger than contracted edge {contracted_edge} with dist={contracted_dist}'
                 nodes[geoid+'_contract'] = pd.Series(contraction_dict)
                 return nodes
+            attrs = ['pop_vap_all', 'vote_tot', 'perimcomputed']
             df = self.qry_to_df(f'select {geoid}, campaign, {ut.join(attrs)} from {self.get_combined()}').set_index(geoid)
             df['vote_rate'] = df['vote_tot'] / df['pop_vap_all']
             df[geoid+'_contract'] = df.index
-            df = df.groupby('campaign').apply(contract)[geoid, geoid+'_contract', 'campaign']
+            df = df.groupby('campaign').apply(contract)[[geoid+'_contract', 'campaign', 'perimcomputed']]
             self.df_to_tbl(df, tbl)
         return tbl
         
