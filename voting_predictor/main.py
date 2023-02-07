@@ -150,9 +150,9 @@ class Voting():
         tbl = f'{attr}.{self.state.abbr}_{geoid}'
         if not self.bq.get_tbl(tbl, overwrite=(attr in self.refresh) & (tbl not in self.tbls)):
             cols = self.bq.get_cols(self.get_combined())
-            sel_id = ['year', geoid+'_contract', 'county', 'campaign', 'candidates', 'midterm', 'federal']
-            sel_geo = {x:f'sum(B.{x}) as {x}' for x in ['arealand', 'areawater', 'areatot', 'areacomputed']}
-            sel_feat = {x:f'sum(B.{x}) as {x}' for x in cols[cols.index('pop_tot_all'):]}
+            sel_id = ['A.year', geoid+'_contract', 'A.county', 'A.campaign', 'A.candidates', 'A.midterm', 'A.federal']
+            sel_geo = {x:f'sum(A.{x}) as {x}' for x in ['arealand', 'areawater', 'areatot', 'areacomputed']}
+            sel_feat = {x:f'sum(A.{x}) as {x}' for x in cols[cols.index('pop_tot_all'):]}
             sel_den = [f'{x} / areatot * 1000000 as {x.replace("pop", "den")}' for x in subpops.keys()]
             qry = f"""
 select
@@ -169,17 +169,17 @@ select
 from (
     select
         {ut.join(sel_id)},
-        sum(B.vote_dem) as vote_dem,
-        sum(B.vote_rep) as vote_rep,
-        sum(B.vote_dem) + sum(vote_rep) as vote_tot,
-        min(B.dist_to_border) as dist_to_border,
+        sum(A.vote_dem) as vote_dem,
+        sum(A.vote_rep) as vote_rep,
+        sum(A.vote_dem) + sum(vote_rep) as vote_tot,
+        min(A.dist_to_border) as dist_to_border,
         {ut.select(sel_geo.values(), 2)},
-        st_perimeter(st_union_agg(C.geometry)) as perimcomputed,
+        st_perimeter(st_union_agg(B.geometry)) as perimcomputed,
         {ut.select(sel_feat.values(), 2)}
-    from {self.get_contract()} as A
-    join {self.get_combined()} as B using ({geoid}, campaign)
-    join {self.get_geo(geoid+'_contract')} as C using ({geoid})
-    group by {ut.join(sel_id)})"""
+    from {self.get_combined()} as A
+    join {self.get_geo(geoid)} as B using ({geoid})
+    join {self.get_contract()} as C using ({geoid}, campaign)
+    group by {ut.join(sel_id)}) as A"""
             self.qry_to_tbl(qry, tbl)
         return tbl
     
