@@ -174,11 +174,12 @@ from (
         sum(B.vote_dem) + sum(vote_rep) as vote_tot,
         min(B.dist_to_border) as dist_to_border,
         {ut.select(sel_geo.values(), 2)},
-        A.perimcomputed,
+        st_perimeter(st_union_agg(C.geometry)) as perimcomputed,
         {ut.select(sel_feat.values(), 2)}
     from {self.get_contract()} as A
     join {self.get_combined()} as B using ({geoid}, campaign)
-    group by {ut.join(sel_id)}, A.perimcomputed)"""
+    join {self.get_geo(geoid+'_contract')} as C using ({geoid})
+    group by {ut.join(sel_id)})"""
             self.qry_to_tbl(qry, tbl)
         return tbl
     
@@ -208,7 +209,7 @@ from (
                     w, trg = min((edge_data['dist'], node) for node, edge_data in G.adj[src].items())
                     for key in attrs:
                         G.nodes[trg][key] += G.nodes[src][key]
-                    G.nodes[trg]['perimcomputed'] -= (2*G.edges[src,trg]['perim_shared'])
+#                     G.nodes[trg]['perimcomputed'] -= (2*G.edges[src,trg]['perim_shared'])
                     G.nodes[trg]['vote_rate'] = G.nodes[trg]['vote_tot'] / G.nodes[trg]['pop_vap_all']
                     nx.contracted_nodes(G, trg, src, False, False)  # contract nodes
                     for node, edge_data in G.adj[trg].items():
@@ -223,7 +224,8 @@ from (
             #         assert dist <= contracted_dist, f'contraction error - edge ({x},{y}) has dist={dist} which is larger than contracted edge {contracted_edge} with dist={contracted_dist}'
                 # nodes[geoid+'_contract'] = pd.Series(contraction_dict)
                 return nodes
-            attrs = ['pop_vap_all', 'vote_tot', 'perimcomputed']
+#             attrs = ['pop_vap_all', 'vote_tot', 'perimcomputed']
+            attrs = ['pop_vap_all', 'vote_tot']
             df = self.qry_to_df(f'select {geoid}, campaign, {ut.join(attrs)} from {self.get_combined()}').set_index(geoid)
             df['vote_rate'] = df['vote_tot'] / df['pop_vap_all']
             df[geoid_contract] = df.index
@@ -394,7 +396,7 @@ select
     B.{geoid} as y,
     A.county,
     st_distance(A.point, B.point) as dist,
-    (A.perimcomputed + B.perimcomputed - st_perimeter(st_union(A.geometry, B.geometry))) / 2 as perim_shared,
+    --(A.perimcomputed + B.perimcomputed - st_perimeter(st_union(A.geometry, B.geometry))) / 2 as perim_shared,
 from {self.get_geo(geoid)} as A
 join {self.get_geo(geoid)} as B
 on A.county = B.county and A.{geoid} <> B.{geoid} and st_intersects(A.geometry, B.geometry)"""
