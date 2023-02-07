@@ -174,11 +174,11 @@ from (
         sum(B.vote_dem) + sum(vote_rep) as vote_tot,
         min(B.dist_to_border) as dist_to_border,
         {ut.select(sel_geo.values(), 2)},
-        min(A.perimcomputed) as perimcomputed,
+        A.perimcomputed,
         {ut.select(sel_feat.values(), 2)}
     from {self.get_contract()} as A
     join {self.get_combined()} as B using ({geoid}, campaign)
-    group by {ut.join(sel_id)})"""
+    group by {ut.join(sel_id)}, A.perimcomputed)"""
             self.qry_to_tbl(qry, tbl)
         return tbl
     
