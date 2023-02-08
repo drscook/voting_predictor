@@ -215,7 +215,6 @@ from (
                     w, trg = min((edge_data['dist'], node) for node, edge_data in G.adj[src].items())
                     for key in attrs:
                         G.nodes[trg][key] += G.nodes[src][key]
-#                     G.nodes[trg]['perimcomputed'] -= (2*G.edges[src,trg]['perim_shared'])
                     G.nodes[trg]['vote_rate'] = G.nodes[trg]['vote_tot'] / G.nodes[trg]['pop_vap_all']
                     nx.contracted_nodes(G, trg, src, False, False)  # contract nodes
                     for node, edge_data in G.adj[trg].items():
