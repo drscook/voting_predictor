@@ -185,6 +185,12 @@ from (
     
     
     def get_contract(self):
+        """Must contract some (typically low population) vtd's together for 2 reasons
+        1. more votes than people - probably due to local population movement
+        2. small counts are always more volatile and less predictable
+        Contraction rule is: contract a VTD with more than 100% vote_rate or less than 100 votes into
+        the closest adjacent vtd (distance defined by straight line between geographic centroids)
+        """
         if (self.state.abbr != 'TX') or (self.level != 'vtd'):
             return False
         attr = 'contract'
