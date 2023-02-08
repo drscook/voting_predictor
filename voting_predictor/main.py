@@ -230,7 +230,6 @@ from (
             #         assert dist <= contracted_dist, f'contraction error - edge ({x},{y}) has dist={dist} which is larger than contracted edge {contracted_edge} with dist={contracted_dist}'
                 # nodes[geoid+'_contract'] = pd.Series(contraction_dict)
                 return nodes
-#             attrs = ['pop_vap_all', 'vote_tot', 'perimcomputed']
             attrs = ['pop_vap_all', 'vote_tot']
             df = self.qry_to_df(f'select {geoid}, campaign, {ut.join(attrs)} from {self.get_combined()}').set_index(geoid)
             df['vote_rate'] = df['vote_tot'] / df['pop_vap_all']
@@ -402,7 +401,6 @@ select
     B.{geoid} as y,
     A.county,
     st_distance(A.point, B.point) as dist,
-    --(A.perimcomputed + B.perimcomputed - st_perimeter(st_union(A.geometry, B.geometry))) / 2 as perim_shared,
 from {self.get_geo(geoid)} as A
 join {self.get_geo(geoid)} as B
 on A.county = B.county and A.{geoid} <> B.{geoid} and st_intersects(A.geometry, B.geometry)"""
