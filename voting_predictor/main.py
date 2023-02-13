@@ -21,8 +21,10 @@ def download(file, url, unzip=True, overwrite=False):
     return file
 
 
+
+
 @dataclasses.dataclass
-class Voting():
+class VotingData():
     census_api_key: str
     bq_project_id: str
     state: str = 'TX'
