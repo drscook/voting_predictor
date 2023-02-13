@@ -229,7 +229,6 @@ from (
             #         dist = edge_data['dist']
             #         contracted_dist, contracted_edge = min((contracted_edge_data['dist'], contracted_edge) for contracted_edge, contracted_edge_data in edge_data['contraction'].items())
             #         assert dist <= contracted_dist, f'contraction error - edge ({x},{y}) has dist={dist} which is larger than contracted edge {contracted_edge} with dist={contracted_dist}'
-                # nodes[geoid+'_contract'] = pd.Series(contraction_dict)
                 return nodes
             attrs = ['pop_vap_all', 'vote_tot']
             df = self.qry_to_df(f'select {geoid}, campaign, {ut.join(attrs)} from {self.get_combined()}').set_index(geoid)
@@ -274,10 +273,6 @@ select
     ifnull(D,0) as vote_dem,
     ifnull(R,0) as vote_rep,
     ifnull(D,0) + ifnull(R,0) as vote_tot,
-    --(ifnull(D,0) + ifnull(R,0)) / greatest(1, pop_vap_all) as vote_rate,
-    --ifnull(D,0) / greatest(1, ifnull(D,0) + ifnull(R,0)) as pref_dem,
-    --ifnull(R,0) / greatest(1, ifnull(D,0) + ifnull(R,0)) as pref_rep,
-    --ntile({self.urbanizations}) over (order by den_tot_all asc) as urbanization,
     A.* except (year, {geoid}, county),
 from {self.get_acs(level='tract', year=min(year, datetime.date.today().year-2), geoid_trg=geoid)} as A
 left join (
@@ -305,7 +300,6 @@ left join (
                 url = f'https://data.capitol.texas.gov/dataset/35b16aee-0bb0-4866-b1ec-859f1f044241/resource/b9ebdbdb-3e31-4c98-b158-0e2993b05efc/download/{zip_file.name}'
                 download(zip_file, url)
                 L = []
-#                 cols = [self.geoid, 'year', 'office', 'midterm', 'federal', 'election', 'name', 'party', 'incumbent', 'votes']
                 cols = [self.geoid, 'year', 'office', 'election', 'name', 'party', 'incumbent', 'votes']
                 for file in path.iterdir():
                     a = ut.prep(file.stem.split('_'))
@@ -316,8 +310,6 @@ left join (
                             repl = {(' ', '.', ','): ''}
                             df['year'] = int(a[0])
                             df['office'] = ut.replace(df['office'], repl)
-#                             df['midterm'] = (df['year']%4)==2
-#                             df['federal'] = df['office'].str.contains('President|USSen|USRep')
                             df['election'] = ut.join(a[1:-2], '_')
                             df['name'] = ut.replace(df['name'], repl)
                             df['incumbent'] = df['incumbent'] == 'Y'
@@ -338,19 +330,19 @@ left join (
             if not self.bq.get_tbl(tbl_src, overwrite=(attr_src in self.refresh) & (tbl_src not in self.tbls)):
                 with Timer():
                     self.rpt(tbl_src)
-                    base = set().union(*features.values())
+                    base = set().union(*acs_features.values())
                     survey = {x for x in base if x[0]=='s'}
                     base = base.difference(survey)
                     B = self.fetch_census(fields=base  , dataset='acs5'  , year=year, level=level)
                     S = self.fetch_census(fields=survey, dataset='acs5st', year=year, level=level)
                     df = ut.prep(B.merge(S, on=['year', geoid_src]))
-                    for name, fields in features.items():
+                    for name, fields in acs_features.items():
                         if fields:
                             df[name] = df[fields].sum(axis=1)
-                    for name, fields in features.items():
+                    for name, fields in acs_features.items():
                         if not fields:
                             self.compute_other(df, name)
-                    self.df_to_tbl(df, tbl_src, cols=['year', geoid_src, *features.keys()])    
+                    self.df_to_tbl(df, tbl_src, cols=['year', geoid_src, *acs_features.keys()])    
             feat_geo = ['county', 'dist_to_border', 'arealand', 'areawater', 'areatot', 'areacomputed', 'perimcomputed', 'polsby_popper']
             feat_acs = self.bq.get_cols(tbl_src)[2:]
             sel_pop = [f'sum({x}) as {x}' for x in subpops.keys()]
