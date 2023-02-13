@@ -9,7 +9,7 @@ subpops = {
     'pop_vap_other': None,
 }
 
-features = {
+acs_features = {
     'pop_tot_all': ['b01001_001e'],
     'pop_tot_hisp': ['b01001i_001e'],
     'pop_tot_white': ['b01001h_001e'],
