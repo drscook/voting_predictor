@@ -1,11 +1,15 @@
 from helpers.common_imports import *
 from helpers import utilities as ut
-import census, us, mechanicalsoup, geopandas as gpd, networkx as nx
+import census, us, mechanicalsoup, geopandas as gpd, networkx as nx, torch
 from .constants import *
 from shapely.ops import orient
 warnings.filterwarnings('ignore', message='.*ShapelyDeprecationWarning.*')
 warnings.filterwarnings('ignore', message='.*DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.*')
 warnings.simplefilter(action='ignore', category=FutureWarning)
+
+########################################################################################
+################################## GET & PREPARE DATA ##################################
+########################################################################################
 
 def download(file, url, unzip=True, overwrite=False):
     """Help download data from internet sources"""
@@ -19,8 +23,6 @@ def download(file, url, unzip=True, overwrite=False):
             ut.unzipper(file)
         print('done', end=ellipsis)
     return file
-
-
 
 
 @dataclasses.dataclass
@@ -585,3 +587,180 @@ join (
                             L.append(df)
                 self.df_to_tbl(pd.concat(L, axis=1), tbl)
         return tbl
+
+########################################################################################
+################################## GET & PREPARE DATA ##################################
+########################################################################################
+
+def tensorify(T):
+    if not torch.is_tensor(T):
+        T = torch.FloatTensor(np.array(T).astype(float)).to(device)
+    return T
+
+@dataclasses.dataclass
+class VotingPredictor(torch.nn.Module):
+    layers: tuple = ()
+    activations: tuple = ()
+    campaign: str = 'all'
+    grp: str = 'all'
+    stop_length: int = 1000
+    max_epochs: int = 100000
+    root_path: str = '/content'
+
+    def __getitem__(self, key):
+        return self.__dict__[key]
+
+    def __setitem__(self, key, val):
+        self.__dict__[key] = val
+
+    def __post_init__(self):
+        super().__init__()
+        P = ut.listify(self.layers)
+        A = ut.listify(self.activations)
+        assert (len(A) == len(P)) or (len(A)==0), 'activations must either be empty or same length as layers'
+        if len(A) == 0:
+            A = [torch.nn.ReLU for _ in P]
+        L = [len(feat), *P, 6]
+        N = [x for k, f in enumerate(A) for x in [torch.nn.Linear(L[k], L[k+1]), f()]] + [torch.nn.Linear(L[-2], L[-1]), torch.nn.Sigmoid()]
+        self.nn = torch.nn.Sequential(*N)
+        self.P = tensorify([[1,1,1,0,0,0],[0,0,0,1,1,1]]).T
+        self.activations = [f.__name__ for f in A]
+        self.path = pathlib.Path(self.root_path) / f'{self.layers}'
+        self.name = f'{self.campaign}_{self.grp}_{self.activations}_{P}'
+        print(self.name)
+
+
+    def forward(self, W, X, Y=None):
+        self.pref_race_pred = self.nn(tensorify(X))
+        self.vote_race_pred = self.pref_race_pred * tensorify(W)
+        self.vote_pred  = self.vote_race_pred @ self.P
+        if torch.is_tensor(Y):
+            self.vote_true = Y
+            self.part_pred = self.vote_pred.sum(axis=1) / W.sum(axis=1) * 100
+            self.part_true = self.vote_true.sum(axis=1) / W.sum(axis=1) * 100
+            self.pref_pred = self.vote_pred / self.vote_pred.sum(axis=1, keepdims=True) * 100
+            self.pref_true = self.vote_true / self.vote_true.sum(axis=1, keepdims=True) * 100
+            self.vote_err  = self.vote_pred - self.vote_true
+            self.part_err  = self.part_pred - self.part_true
+            self.pref_err  = self.pref_pred - self.pref_true
+        return self.vote_pred
+
+
+    def train(self, DFS):
+        W = {splt:tensorify(df[wght]) for splt,df in DFS.items()}
+        X = {splt:tensorify(df[feat]) for splt,df in DFS.items()}
+        Y = {splt:tensorify(df[targ]) for splt,df in DFS.items()}
+        optimizer = torch.optim.Adam(self.nn.parameters())
+        loss_fcn = torch.nn.MSELoss()
+        self.score = {'vote_err':dict(), 'part_err':dict(), 'pref_err':dict()}
+        self.loss = {'tst':[], 'trn':[]}
+        def get_stats(z):
+            return {'mean':z.mean().item(), 'std':z.std().item(), 'rmse': (z**2).mean().sqrt().item(), 'min':z.min().item(), 'q1':z.quantile(0.25).item(), 'median':z.quantile(0.50).item(), 'q3':z.quantile(0.75).item(), 'max':z.max().item()}
+
+        epoch = 0
+        self.best = {'loss':10000000}
+        while True:
+            for splt in ['tst', 'trn']:
+                loss = loss_fcn(Y[splt], self.forward(W[splt], X[splt], Y[splt]))
+                self.loss.setdefault(splt, list()).append(loss.sqrt().item())
+                for score, rec in self.score.items():
+                    rec.setdefault(splt, dict())
+                    for stat, val in get_stats(self[score]).items():
+                        rec[splt].setdefault(stat, []).append(val)
+            # check = self.loss['trn'] - self.score['vote_err']['trn']['rmse'][-1]
+            # assert abs(check) < 0.001, check
+            
+            l = self.loss['tst'][-1]
+            if l < self.best['loss']:
+                self.best = {'epoch':epoch, 'loss':l, 'state_dict':self.nn.state_dict()}
+            if (epoch - self.best['epoch'] > self.stop_length) or (epoch >= self.max_epochs):
+                if epoch >= self.max_epochs:
+                    msg = f'max epochs {self.max_epochs} reached'
+                else:
+                    msg = f'test score has not improved for {self.stop_length} epochs'
+                print(msg + f" ... training stopped and state restored to best epoch {self.best['epoch']} with loss {self.best['loss']:.3f}")
+                break
+            if epoch % 1000 == 0:
+                print(f"epoch: {str(epoch).rjust(5,' ')}, best_loss: {self.best['loss']:.3f}")
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            epoch += 1
+
+        k = self.best['epoch']+1
+        for splt in ['tst', 'trn']:
+            self.loss[splt] = self.loss[splt][:k]
+            for score, rec in self.score.items():
+                for stat, val in rec[splt].items():
+                    val = val[:k]
+
+        splt = 'tst'
+        self.nn.load_state_dict(self.best['state_dict'])
+        self.forward(W[splt], X[splt], Y[splt])
+        Z = []
+        for x in ['vote', 'pref']:
+            for y in ['race_pred']:
+                c = x+'_'+y
+                self[c] = pd.DataFrame(self[c].numpy(force=True), columns=[f'{x}_{p}_{r}_pred'for p in prty for r in race ])
+                Z.append(self[c])
+        for x in ['vote', 'pref']:
+            for y in ['pred', 'true', 'err']:
+                c = x+'_'+y
+                self[c] = pd.DataFrame(self[c].numpy(force=True), columns=[f'{x}_{p}_{y}' for p in prty])
+                Z.append(self[c])
+        for x in ['part']:
+            for y in ['pred', 'true', 'err']:
+                c = x+'_'+y
+                self[c] = pd.DataFrame(self[c].numpy(force=True), columns=[f'{x}_{y}'])
+                Z.append(self[c])
+        self.df = pd.concat([DFS[splt][labl+wght[:3]+feat].reset_index(), *Z], axis=1)
+
+    
+    def get_summary(self):
+        splt = 'tst'
+        self.summary = {
+            'group':self.grp,
+            'campaign':self.campaign,
+            'layers':self.layers,
+            'activations':self.activations.copy(),
+            'epoch':self.best['epoch'],
+            'loss':self.loss[splt][-1],
+            }
+        for score, rec in self.score.items():
+            for stat, val in self.score[score][splt].items():
+                self.summary[f'{score}_{stat}'] = val[-1]
+        return self.summary
+
+
+    def save(self, filename=None):
+        try:
+            fn = pathlib.Path(filename)
+            if len(fn.parts) <= 1:
+                fn = self.path / filename
+        except:
+            fn = pathlib.Path(self.path / self.name)
+        fn = fn.with_suffix('.pth')
+        ut.mkdir(fn.parent)
+        torch.save(self, fn)
+        self.get_summary()
+        self.summary['filename'] = str(fn)
+        return self.summary
+
+
+    def plot(self, start=None):
+        fig, ax = plt.subplots(1, len(self.score), figsize=(30,4))
+        ax = ut.listify(ax)
+        i = 0
+        for score, rec in self.score.items():
+            for splt, stats in rec.items():
+                stat = 'rmse'
+                y = stats[stat]
+                x = np.arange(len(y))
+                if start is None:
+                    start = int(len(y)*0.2)
+                ax[i].plot(x[start:], y[start:], '.', label=f'{splt}: {round(y[-1], 2)}')
+            ax[i].legend(loc='upper right')
+            ax[i].set_title(f'{score} {stat}')
+            i += 1
+        fig.suptitle(self.name)
+        plt.show()
