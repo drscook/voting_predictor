@@ -591,7 +591,7 @@ join (
 ########################################################################################
 ################################## GET & PREPARE DATA ##################################
 ########################################################################################
-
+device = "cuda" if torch.cuda.is_available() else "cpu"
 def tensorify(T):
     if not torch.is_tensor(T):
         T = torch.FloatTensor(np.array(T).astype(float)).to(device)
