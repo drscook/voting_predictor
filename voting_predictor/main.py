@@ -621,7 +621,7 @@ class VotingPredictor(torch.nn.Module):
         assert (len(A) == len(P)) or (len(A)==0), 'activations must either be empty or same length as layers'
         if len(A) == 0:
             A = [torch.nn.ReLU for _ in P]
-        L = [len(self.n_feat), *P, 6]
+        L = [self.n_feat, *P, 6]
         N = [x for k, f in enumerate(A) for x in [torch.nn.Linear(L[k], L[k+1]), f()]] + [torch.nn.Linear(L[-2], L[-1]), torch.nn.Sigmoid()]
         self.nn = torch.nn.Sequential(*N)
         self.P = tensorify([[1,1,1,0,0,0],[0,0,0,1,1,1]]).T
