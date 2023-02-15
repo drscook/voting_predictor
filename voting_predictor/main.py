@@ -595,6 +595,7 @@ join (
 @dataclasses.dataclass
 class VotingPredictor(torch.nn.Module):
     feat: tuple
+    labl: tuple
     prty: tuple = ('dem', 'rep')
     race: tuple = ('hisp', 'other', 'white')
     layers: tuple = ()
@@ -724,7 +725,7 @@ class VotingPredictor(torch.nn.Module):
                 c = x+'_'+y
                 self[c] = pd.DataFrame(self[c].numpy(force=True), columns=[f'{x}_{y}'])
                 Z.append(self[c])
-        self.df = pd.concat([DFS[splt][labl+wght[:3]+feat].reset_index(), *Z], axis=1)
+        self.df = pd.concat([DFS[splt][self.labl+self.wght[:3]+self.feat].reset_index(), *Z], axis=1)
 
     
     def get_summary(self):
