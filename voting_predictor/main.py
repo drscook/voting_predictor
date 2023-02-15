@@ -634,8 +634,8 @@ class VotingPredictor(torch.nn.Module):
 
         
     def forward(self, W, X, Y=None):
-        self.pref_race_pred = self.nn(tensorify(X))
-        self.vote_race_pred = self.pref_race_pred * tensorify(W)
+        self.pref_race_pred = self.nn(self.tensorify(X))
+        self.vote_race_pred = self.pref_race_pred * self.tensorify(W)
         self.vote_pred  = self.vote_race_pred @ self.P
         if torch.is_tensor(Y):
             self.vote_true = Y
@@ -650,9 +650,9 @@ class VotingPredictor(torch.nn.Module):
 
 
     def train(self, DFS):
-        W = {splt:tensorify(df[wght]) for splt,df in DFS.items()}
-        X = {splt:tensorify(df[feat]) for splt,df in DFS.items()}
-        Y = {splt:tensorify(df[targ]) for splt,df in DFS.items()}
+        W = {splt:self.tensorify(df[wght]) for splt,df in DFS.items()}
+        X = {splt:self.tensorify(df[feat]) for splt,df in DFS.items()}
+        Y = {splt:self.tensorify(df[targ]) for splt,df in DFS.items()}
         optimizer = torch.optim.Adam(self.nn.parameters())
         loss_fcn = torch.nn.MSELoss()
         self.score = {'vote_err':dict(), 'part_err':dict(), 'pref_err':dict()}
