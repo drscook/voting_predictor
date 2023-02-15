@@ -594,9 +594,9 @@ join (
 
 @dataclasses.dataclass
 class VotingPredictor(torch.nn.Module):
-    feat: list
-    targ: list
-    wght: list
+    feat: tuple
+    prty: tuple = ('dem', 'rep')
+    race: tuple = ('hisp', 'other', 'white')
     layers: tuple = ()
     activations: tuple = ()
     campaign: str = 'all'
@@ -614,6 +614,9 @@ class VotingPredictor(torch.nn.Module):
 
     def __post_init__(self):
         super().__init__()
+        self.wght = [f'pop_vap_{r}' for p in self.prty for r in self.race]
+        self.targ = [f'vote_{p}'    for p in self.prty]
+
         P = ut.listify(self.layers)
         A = ut.listify(self.activations)
         assert (len(A) == len(P)) or (len(A)==0), 'activations must either be empty or same length as layers'
@@ -709,12 +712,12 @@ class VotingPredictor(torch.nn.Module):
         for x in ['vote', 'pref']:
             for y in ['race_pred']:
                 c = x+'_'+y
-                self[c] = pd.DataFrame(self[c].numpy(force=True), columns=[f'{x}_{p}_{r}_pred'for p in prty for r in race ])
+                self[c] = pd.DataFrame(self[c].numpy(force=True), columns=[f'{x}_{p}_{r}_pred' for p in self.prty for r in self.race])
                 Z.append(self[c])
         for x in ['vote', 'pref']:
             for y in ['pred', 'true', 'err']:
                 c = x+'_'+y
-                self[c] = pd.DataFrame(self[c].numpy(force=True), columns=[f'{x}_{p}_{y}' for p in prty])
+                self[c] = pd.DataFrame(self[c].numpy(force=True), columns=[f'{x}_{p}_{y}' for p in self.prty])
                 Z.append(self[c])
         for x in ['part']:
             for y in ['pred', 'true', 'err']:
