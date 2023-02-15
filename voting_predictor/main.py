@@ -594,7 +594,9 @@ join (
 
 @dataclasses.dataclass
 class VotingPredictor(torch.nn.Module):
-    n_feat: int
+    feat: list
+    targ: list
+    wght: list
     layers: tuple = ()
     activations: tuple = ()
     campaign: str = 'all'
@@ -650,9 +652,9 @@ class VotingPredictor(torch.nn.Module):
 
 
     def train(self, DFS):
-        W = {splt:self.tensorify(df[wght]) for splt,df in DFS.items()}
-        X = {splt:self.tensorify(df[feat]) for splt,df in DFS.items()}
-        Y = {splt:self.tensorify(df[targ]) for splt,df in DFS.items()}
+        W = {splt:self.tensorify(df[self.wght]) for splt,df in DFS.items()}
+        X = {splt:self.tensorify(df[self.feat]) for splt,df in DFS.items()}
+        Y = {splt:self.tensorify(df[self.targ]) for splt,df in DFS.items()}
         optimizer = torch.optim.Adam(self.nn.parameters())
         loss_fcn = torch.nn.MSELoss()
         self.score = {'vote_err':dict(), 'part_err':dict(), 'pref_err':dict()}
