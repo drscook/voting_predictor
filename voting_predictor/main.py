@@ -620,7 +620,7 @@ class VotingPredictor(torch.nn.Module):
         L = [self.n_feat, *P, 6]
         N = [x for k, f in enumerate(A) for x in [torch.nn.Linear(L[k], L[k+1]), f()]] + [torch.nn.Linear(L[-2], L[-1]), torch.nn.Sigmoid()]
         self.nn = torch.nn.Sequential(*N)
-        self.P = tensorify([[1,1,1,0,0,0],[0,0,0,1,1,1]]).T
+        self.P = self.tensorify([[1,1,1,0,0,0],[0,0,0,1,1,1]]).T
         self.activations = [f.__name__ for f in A]
         self.path = pathlib.Path(self.root_path) / f'{self.layers}'
         self.name = f'{self.campaign}_{self.grp}_{self.activations}_{P}'
