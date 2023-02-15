@@ -591,11 +591,6 @@ join (
 ########################################################################################
 ################################## GET & PREPARE DATA ##################################
 ########################################################################################
-device = "cuda" if torch.cuda.is_available() else "cpu"
-def tensorify(T):
-    if not torch.is_tensor(T):
-        T = torch.FloatTensor(np.array(T).astype(float)).to(device)
-    return T
 
 @dataclasses.dataclass
 class VotingPredictor(torch.nn.Module):
@@ -607,6 +602,7 @@ class VotingPredictor(torch.nn.Module):
     stop_length: int = 1000
     max_epochs: int = 100000
     root_path: str = '/content'
+    device: str = 'cpu'
 
     def __getitem__(self, key):
         return self.__dict__[key]
@@ -630,7 +626,13 @@ class VotingPredictor(torch.nn.Module):
         self.name = f'{self.campaign}_{self.grp}_{self.activations}_{P}'
         print(self.name)
 
+        
+    def tensorify(self, T):
+        if not torch.is_tensor(T):
+            T = torch.FloatTensor(np.array(T).astype(float)).to(self.device)
+        return T
 
+        
     def forward(self, W, X, Y=None):
         self.pref_race_pred = self.nn(tensorify(X))
         self.vote_race_pred = self.pref_race_pred * tensorify(W)
