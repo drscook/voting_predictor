@@ -617,7 +617,6 @@ class VotingPredictor(torch.nn.Module):
         super().__init__()
         self.wght = [f'pop_vap_{r}' for p in self.prty for r in self.race]
         self.targ = [f'vote_{p}'    for p in self.prty]
-
         P = ut.listify(self.layers)
         A = ut.listify(self.activations)
         assert (len(A) == len(P)) or (len(A)==0), 'activations must either be empty or same length as layers'
@@ -659,9 +658,6 @@ class VotingPredictor(torch.nn.Module):
         W = {splt:self.tensorify(df[self.wght]) for splt,df in DFS.items()}
         X = {splt:self.tensorify(df[self.feat]) for splt,df in DFS.items()}
         Y = {splt:self.tensorify(df[self.targ]) for splt,df in DFS.items()}
-        print([w.shape for w in W.values()])
-        print([x.shape for x in X.values()])
-        print([y.shape for y in Y.values()])
         optimizer = torch.optim.Adam(self.nn.parameters())
         loss_fcn = torch.nn.MSELoss()
         self.score = {'vote_err':dict(), 'part_err':dict(), 'pref_err':dict()}
