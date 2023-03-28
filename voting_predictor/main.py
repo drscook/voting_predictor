@@ -666,7 +666,7 @@ class VotingPredictor(torch.nn.Module):
             return {'mean':z.mean().item(), 'std':z.std().item(), 'rmse': (z**2).mean().sqrt().item(), 'min':z.min().item(), 'q1':z.quantile(0.25).item(), 'median':z.quantile(0.50).item(), 'q3':z.quantile(0.75).item(), 'max':z.max().item()}
 
         epoch = 0
-        self.best = {'loss':10000000, 'epoch':epoch}
+        self.best = {'loss':10000000, 'epoch':epoch, 'state_dict':self.nn.state_dict()}
         while True:
             for splt in ['tst', 'trn']:
                 loss = loss_fcn(Y[splt], self.forward(W[splt], X[splt], Y[splt]))
