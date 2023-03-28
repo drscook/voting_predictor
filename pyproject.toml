@@ -9,7 +9,7 @@ allow-direct-references = true
 name = "voting_predictor"
 dynamic = ["version"]
 description = "Commonly used helpers"
-dependencies = ["helpers@git+https://github.com/drscook/helpers", 'census', 'us', 'geopandas', 'shapely', 'mechanicalsoup']
+dependencies = ["helpers@git+https://github.com/drscook/helpers@dev", 'census', 'us', 'geopandas', 'shapely', 'mechanicalsoup']
 
 [tool.hatch.version]
 path = "voting_predictor/__about__.py"
