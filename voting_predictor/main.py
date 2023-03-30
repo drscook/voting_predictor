@@ -128,18 +128,18 @@ class VotingData():
         except KeyError:
             print(f'Can not compute other{feat}', end=ellipsis)
 
-    def qry_to_tbl(self, qry, tbl, show=False):
+    def qry_to_tbl(self, qry, tbl, overwrite=True, show=False):
         with Timer():
             self.rpt(tbl)
             if show:
                 print(qry)
-            self.bq.qry_to_tbl(qry, tbl)
+            self.bq.qry_to_tbl(qry, tbl, overwrite)
             self.tbls.add(tbl)
     
-    def df_to_tbl(self, df, tbl, cols=None):
+    def df_to_tbl(self, df, tbl, overwrite=True, cols=None):
         cols = cols if cols else df.columns
         cols = [x for x in ut.listify(cols) if x in df.columns]
-        self.bq.df_to_tbl(ut.prep(df[cols]), tbl)
+        self.bq.df_to_tbl(ut.prep(df[cols]), tbl, overwrite)
         self.tbls.add(tbl)
 
     def qry_to_df(self, qry):
